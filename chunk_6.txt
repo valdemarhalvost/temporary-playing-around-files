@@ -1,0 +1,2880 @@
+﻿      default:
+     	  tell_object(caster,"Your pact fails to reach out to a suitable plane, and the spell fails.");
+        tell_room(place,caster->QCN+" pauses and looks a little disoriented.",caster);
+        TO->remove();
+        return;
+      break;
+    }
+
+    spell_successful();
+    caster->setAdminBlock();
+    call_out("move_caster", ROUND_LENGTH, endplace, prof);
+}
+
+void move_caster(object endplace, int prof) {
+    object *party, *presentparty, *followers;
+    int i, healed;
+
+    if (!objectp(caster)) {
+        dest_effect();
+        return;
+    }
+    caster->removeAdminBlock();
+    if (caster->query_ghost()) { dest_effect(); return; }
+
+    if (!endplace) {
+        tell_object(caster,"You pause before stepping into the rift, sensing that something strange has happened to your target location.");
+        tell_room(place,caster->QCN+" apparently looks quite startled.");
+        dest_effect();
+        return;
+    }
+    if (sizeof(caster->query_attackers())) {
+        tell_object(caster,"Combat distracts you from your invocation, and the rift ripples and vanishes.");
+        tell_room(place,caster->QCN+" is distracted by combat, and the rift ripples and vanishes.");
+        dest_effect();
+        return;
+    }
+
+    presentparty = ({});
+    if(caster->query_party()) { // pick up any party members that are in the room with the caster on spell activation
+      party = PARTY_D->query_party_members(caster->query_party());
+      if(sizeof(party)) {
+        for(i=0;i<sizeof(party);i++) {
+          if(environment(party[i]) == environment(caster) && party[i] != caster) {
+            if(sizeof(party[i]->query_attackers())) {
+              tell_object(party[i],"%^CYAN%^"+caster->QCN+" reaches out to you, but you are too busy fighting!%^RESET%^");
+              tell_object(caster,"%^CYAN%^You reach out to take "+party[i]->QCN+" with you, but "+party[i]->QS+" is too busy fighting!%^RESET%^");
+            }
+            else presentparty += ({ party[i] });
+          }
+        }
+      }
+    }
+
+    if(!sizeof(presentparty))
+    { // teleporting alone!
+      followers = caster->query_followers();
+      if(sizeof(followers)) {
+        for(i=0;i<sizeof(followers);i++) {
+            if(!objectp(followers[i])) continue;
+            presentparty += ({followers[i]});
+            //followers[i]->set_following(0);
+        }
+      }
+      //caster->clear_followers();
+      tell_object(caster,"%^CYAN%^You step into the rift, and in the blink of an eye you step out again at "+endplace->query_short()+".%^RESET%^");
+      tell_room(place,"%^CYAN%^"+caster->QCN+" steps into the rift, and it snaps out of existence as if it had never been!%^RESET%^", caster);
+      switch(heritage) {
+        case "celestial":
+          tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^ORANGE%^radiant light %^CYAN%^from which "+caster->QCN+" steps. It snaps shut behind "+caster->QO+"!%^RESET%^",caster);
+        break;
+        case "fey":
+          tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^GREEN%^verdant mists %^CYAN%^from which "+caster->QCN+" steps. It snaps shut behind "+caster->QO+"!%^RESET%^",caster);
+        break;
+        case "abyssal":
+          tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^MAGENTA%^shifting fog %^CYAN%^from which "+caster->QCN+" steps. It snaps shut behind "+caster->QO+"!%^RESET%^",caster);
+        break;
+		case "star":
+          tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^MAGENTA%^endless cosmos %^CYAN%^from which "+caster->QCN+" steps. It snaps shut behind "+caster->QO+"!%^RESET%^",caster);
+        break;
+        case "gloom":
+          tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^BOLD%^%^BLACK%^drifting shadows %^RESET%^%^CYAN%^from which "+caster->QCN+" steps. It snaps shut behind "+caster->QO+"!%^RESET%^",caster);
+        break;
+        case "infernal":
+          tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^RED%^torrid smoke %^CYAN%^from which "+caster->QCN+" steps. It snaps shut behind "+caster->QO+"!%^RESET%^",caster);
+        break;
+        default:
+          tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^from which "+caster->QCN+" steps. It snaps shut behind "+caster->QO+"!%^RESET%^",caster);
+        break;
+      }
+      TELEPORT->teleport_object(caster,caster,endplace,clevel);
+      presentparty->move(endplace);
+    }
+    else { // group teleport!
+      tell_object(caster,"%^CYAN%^Linking hands with your allies, you step into the %^RESET%^hazy rift%^CYAN%^, and in the blink of an eye you step out again at "+endplace->query_short()+".%^RESET%^");
+      for(i=0;i<sizeof(presentparty);i++) {
+        tell_object(presentparty[i],"%^CYAN%^Linking hands with your allies, you step into the %^RESET%^hazy rift%^CYAN%^, and in the blink of an eye you step out again at "+endplace->query_short()+".%^RESET%^");
+      }
+      if(sizeof(presentparty) > 1) {
+        switch(heritage) {
+          case "celestial":
+            tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^ORANGE%^radiant light %^CYAN%^from which "+caster->QCN+" steps, followed by several others. It snaps shut behind them!%^RESET%^",caster);
+          break;
+          case "fey":
+            tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^GREEN%^verdant mists %^CYAN%^from which "+caster->QCN+" steps, followed by several others. It snaps shut behind them!%^RESET%^",caster);
+          break;
+          case "abyssal":
+            tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^MAGENTA%^shifting fog %^CYAN%^from which "+caster->QCN+" steps, followed by several others. It snaps shut behind them!%^RESET%^",caster);
+          break;
+		  case "star":
+            tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^BLUE%^endless cosmos %^CYAN%^from which "+caster->QCN+" steps, followed by several others. It snaps shut behind them!%^RESET%^",caster);
+          break;
+          case "gloom":
+            tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^BOLD%^%^BLACK%^drifting shadows %^RESET%^%^CYAN%^from which "+caster->QCN+" steps, followed by several others. It snaps shut behind them!%^RESET%^");
+          break;
+          case "infernal":
+            tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^RED%^torrid smoke %^CYAN%^from which "+caster->QCN+" steps, followed by several others. It snaps shut behind them!%^RESET%^",caster);
+          break;
+          default:
+            tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^from which "+caster->QCN+" steps, followed by several others. It snaps shut behind them!%^RESET%^",caster);
+          break;
+        }
+      }
+      else {
+        switch(heritage) {
+          case "celestial":
+            tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^ORANGE%^radiant light %^CYAN%^from which "+caster->QCN+" steps, followed by another. It snaps shut behind them!%^RESET%^",caster);
+          break;
+          case "fey":
+            tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^GREEN%^verdant mists %^CYAN%^from which "+caster->QCN+" steps, followed by another. It snaps shut behind them!%^RESET%^",caster);
+          break;
+          case "abyssal":
+            tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^MAGENTA%^shifting fog %^CYAN%^from which "+caster->QCN+" steps, followed by another. It snaps shut behind them!%^RESET%^",caster);
+          break;
+		  case "star":
+            tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^BLUE%^endless cosmos %^CYAN%^from which "+caster->QCN+" steps, followed by another. It snaps shut behind them!%^RESET%^",caster);
+          break;
+          case "gloom":
+            tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^BOLD%^%^BLACK%^drifting shadows %^RESET%^%^CYAN%^from which "+caster->QCN+" steps, followed by another. It snaps shut behind them!%^RESET%^");
+          break;
+          case "infernal":
+            tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^of %^RED%^torrid smoke %^CYAN%^from which "+caster->QCN+" steps, followed by another. It snaps shut behind them!%^RESET%^",caster);
+          break;
+          default:
+            tell_room(endplace,"%^CYAN%^A rift suddenly parts reality in the air before you, revealing a %^RESET%^hazy realm %^CYAN%^from which "+caster->QCN+" steps, followed by another. It snaps shut behind them!%^RESET%^",caster);
+          break;
+        }
+      }
+      presentparty += ({ caster }); // just to make the message work!
+      tell_room(place,"%^CYAN%^"+caster->QCN+" links hands with "+caster->QP+" companions and steps into the %^RESET%^hazy rift %^CYAN%^with them, and the fissure snaps out of existence as if it had never been!%^RESET%^", presentparty);
+      presentparty -= ({ caster });
+
+      followers = caster->query_followers();
+      if(sizeof(followers)) {
+        presentparty += followers;
+        for(i=0;i<sizeof(followers);i++) {
+            if(!objectp(followers[i]))
+            {
+                presentparty -= ({followers[i]});
+                continue;
+            }
+            if(member_array(followers[i],presentparty) != -1) continue;
+            //followers[i]->set_following(0);
+            //caster->remove_follower(followers[i]);
+        }
+      }
+      TELEPORT->teleport_object(caster,caster,endplace,clevel); // caster should go first, followed by the rest.
+      for(i=0;i<sizeof(presentparty);i++) { TELEPORT->teleport_object(caster,presentparty[i],endplace,clevel); }
+    }
+    if(caster->query_hp() < caster->query_max_hp()){ // the travel heals the caster if injured!
+      tell_object(caster,"%^BOLD%^%^CYAN%^You feel refreshed by your brief passage across the planes!%^RESET%^");
+      healed = -sdamage*5/4;
+      damage_targ(caster,"torso", healed,"untyped");
+    }
+    dest_effect();
+}
+
+void dest_effect() {
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+}
+#include <spell.h>
+#include <magic.h>
+#include <rooms.h>
+inherit SPELL;
+
+object invisob;
+
+void create() {
+    ::create();
+    set_author("nienne");
+    set_spell_name("walk unseen");
+    set_spell_level(([ "warlock" : 2 ]));
+    set_spell_sphere("illusion");
+    set_syntax("cast CLASS walk unseen");
+    set_damage_desc("invisible");
+    set_description("This invocation places illusory spellcraft around the warlock, deceiving the "
+"eyes of those around so as to effectively disappear from view. While minor, a small degree of "
+"concentration is required to maintain the effect, so it can become wearying over time. Becoming "
+"engaged in combat is sufficiently distracting to lose control of the concealment; also, falling "
+"unconscious will cause the invocation to fail. Of course, the warlock can simply forgo the "
+"concentration to <appear> at any time.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_helpful_spell(1);
+}
+
+string query_cast_string() {
+    tell_object(caster,"%^MAGENTA%^Your fingers trace the pattern of a lesser invocation.%^RESET%^");
+    tell_room(place,"%^MAGENTA%^"+caster->QCN+"'s fingers trace the pattern of an invocation.%^RESET%^",caster);
+    return "display";
+}
+
+void spell_effect(int prof) {
+    tell_object(caster,"%^MAGENTA%^Colors run like %^GREEN%^l%^CYAN%^i%^BLUE%^q%^MAGENTA%^u%^RED%^i%^ORANGE%^d %^MAGENTA%^across your skin, aligning with the world around you so that you disappear from view.%^RESET%^");
+    tell_room(place,"%^MAGENTA%^Colors run like %^GREEN%^l%^CYAN%^i%^BLUE%^q%^MAGENTA%^u%^RED%^i%^ORANGE%^d %^MAGENTA%^across "+caster->QCN+"'s skin, aligning with the world around you until "+caster->QS+" disappears from view.%^RESET%^",caster);
+    call_out("targ_vanish",2);
+}
+
+void targ_vanish() {
+    if (caster->query_invis()) {
+        tell_object(caster,"You're already invisible!");
+        TO->remove();
+        return;
+    }
+    if(caster->query_property("visible")){
+        tell_object(caster,"The invocation fails utterly.");
+        TO->remove();
+        return;
+    }
+    spell_successful();
+    invisob=new("/d/magic/obj/trick_invisob.c");
+    invisob->set_property("spell",TO);
+    invisob->set_property("spelled", ({TO}) );
+    invisob->move_is_ok(1);
+    invisob->move(caster);
+    invisob->set_prof(100);
+    invisob->move_is_ok(0);
+    addSpellToCaster();
+}
+
+void dest_effect() {
+    if(objectp(caster)) {
+      tell_object(caster,"%^MAGENTA%^You release concentration upon the invocation and reappear.%^RESET%^");
+      tell_room(environment(caster),"%^MAGENTA%^A section of the world blurs, before resolving into the form of "+caster->QCN+".%^RESET%^",caster);
+    }
+    if (objectp(invisob)) invisob->show_up();
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+}
+#include <spell.h>
+#include <magic.h>
+#include <daemons.h>
+inherit SPELL;
+
+int i;
+object endplace, outside, wall, wall2;
+string *dir_listing(string tempfil);
+
+void create() {
+    ::create();
+    set_spell_name("wall of ectoplasm");
+    set_spell_level(([ "psion" : 4 ]));
+    set_spell_sphere("invocation_evocation");
+    set_syntax("cast CLASS wall of ectoplasm on <exit>");
+    set_description("Wall of ectoplasm is a potent power in the hands "
+       "of a practiced psion.  The power calls into being a field of "
+       "ectoplasm to block an exit. The wall can be ended by typing <remove wall>.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_arg_needed();
+    set_damage_desc("untyped");
+    set_helpful_spell(1);
+}
+
+string query_cast_string() {
+    return "%^ORANGE%^"+caster->QCN+" closes "+caster->QP+" eyes, "+
+       "placing "+caster->QP+" palms together before "+caster->QO+".";
+}
+
+void spell_effect(int prof) {
+    string *outs, *ins, *limbs, arg;
+    object *exits, *inexits, *burned;
+    int i, j,mylevel;
+    ::spell_effect();
+    if (ARG)
+        arg=lower_case(ARG);
+    if (member_array(arg,place->query_exits()) < 0) {
+        tell_object(caster,"You must specify an exit to block with this power!");
+        return;
+    }
+    mylevel = clevel;
+    wall=new("/d/magic/obj/ecto_wall.c");
+    wall->set_property("spell",TO);
+    wall->set_property("spelled", ({TO}) );
+    if (objectp(wall))
+        wall->move(place);
+    else
+        return;
+    wall->block(caster,arg);
+    tell_room(place,"%^CYAN%^A shimmering field suddenly springs up, "+
+       "blocking the "+arg+"!");
+    outside = find_object_or_load(place->query_exit(arg));
+    ins = outside->query_exits();
+    for (i=0;i<sizeof(ins);i++) {
+        if ( base_name(place) ==
+             (string)outside->query_exit(ins[i]) ||
+             base_name(place)+".c" ==
+             (string)outside->query_exit(ins[i]) ||
+             base_name(place) ==
+             (string)outside->query_exit(ins[i])+".c") {
+            wall2=new("/d/magic/obj/ecto_wall.c");
+            wall2->set_property("spell",TO);
+            wall2->move(outside);
+            wall2->block(caster,ins[i]);
+            tell_room(outside,"%^CYAN%^A shimmering field suddenly "+
+                      "spring up, blocking the "+
+                      ins[i]+"!%^RESET%^");
+            break;
+        }
+    }
+    spell_successful();
+    spell_duration = (clevel + roll_dice(1, 20)) * ROUND_LENGTH * 10;
+    set_end_time();
+    call_out("dest_effect",(spell_duration));
+    return;
+}
+
+void dest_effect() {
+    if (objectp(wall))
+        wall->remove_wall();
+    if (objectp(wall2))
+        wall2->remove_wall();
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+    return;
+}
+//      Wall of fire
+#include <spell.h>
+#include <magic.h>
+#include <daemons.h>
+inherit SPELL;
+
+int i, hpcount;
+string tempstr, element;
+object endplace, outside, wall, wall2;
+
+string *dir_listing(string tempfil);
+
+void create() {
+    ::create();
+    set_spell_name("wall of fire");
+    set_spell_level(([ "mage" : 4, "monk" : 13, "oracle" : 4, "magus" : 4, "druid" : 5 , "nightblade":4]));
+    set_mystery(({"battle","flame"}));
+    set_domains("fire");
+    set_spell_sphere("invocation_evocation");
+    set_monk_way("way of the elements");
+    set_damage_desc("fire");
+    set_syntax("cast CLASS wall of fire [on EXIT]");
+
+    set_description("The spell, wall of fire, is an impressive spell for the magi indeed.  The wizard can cast the wall "
+"around himself, protectively, or in front of an exit, so all who pass through that exit will be scorched by the flames.  "
+"To cast the wall around him/herself, the mage simply types <cast classname wall of fire>.  Otherwise, the mage might "
+"type <cast classname wall of fire on north> to damage those passing through the exit.  Be warned however, the mage who "
+"casts this spell must keep concentration on the wall to maintain its existence.  The mage may type <remove wall> to "
+"quench the flames. A versatile arcanist can manipulate the base element of this spell.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_arg_needed();
+    set_components(([
+      "mage" : ([ "phosphorus":1, ]),
+    ]));
+    set_helpful_spell(1);
+    traveling_spell(1); // For damage calculations only
+}
+
+string query_cast_string() {
+    return "%^BOLD%^%^WHITE%^"+caster->QCN+" stretches "+caster->QP+" arms outward, hands spread open, chanting mightily.";
+}
+
+void spell_effect(int prof) {
+    string *outs, *ins, *limbs, arg;
+    object *exits, *inexits, *burned;
+    int i, j;
+    ::spell_effect();
+
+    hpcount=caster->query_hp();
+    if(arg && arg != "" && arg != " ") { arg=lower_case(arg); }
+
+    element = (string)caster->query("elementalist");
+    // force-type to fire if anything outside the normal five-element subset. Since the non-interactive doesn't have a switch to fix this, it's necessary.
+    if(element != "acid" && element != "cold" && element != "electricity" && element != "sonic") element = "fire";
+
+    if (member_array(arg,place->query_exits()) < 0) {
+        switch(element) {
+          case "acid":
+            tell_object(caster,"%^GREEN%^A cloud of hissing vapor rises up around you.");
+            tell_room(place,"%^GREEN%^A cloud of hissing vapor rises up around "+caster->QCN+"!", caster);
+            wall=new("/d/magic/obj/vaporcloud.c");
+          break;
+          case "cold":
+            tell_object(caster,"%^CYAN%^An aura of chilling air rises up around you.");
+            tell_room(place,"%^CYAN%^An aura of chilling air rises up around "+caster->QCN+"!", caster);
+            wall=new("/d/magic/obj/frostcloud.c");
+          break;
+          case "electricity":
+        tell_object(caster,"%^ORANGE%^The air around you seems to come to life, and arcs of %^YELLOW%^el%^WHITE%^e%^YELLOW%^ctri%^WHITE%^c%^YELLOW%^ity %^RESET%^%^ORANGE%^crackle around you!%^RESET%^");
+        tell_room(place,"%^ORANGE%^The air around you seems to come to life, and arcs of %^YELLOW%^el%^WHITE%^e%^YELLOW%^ctri%^WHITE%^c%^YELLOW%^ity %^RESET%^%^ORANGE%^crackle around "
++caster->QCN+"!%^RESET%^", caster);
+            wall=new("/d/magic/obj/staticfield.c");
+          break;
+          case "sonic":
+            tell_object(caster,"%^MAGENTA%^The air around you takes on a dull hum.");
+            tell_room(place,"%^MAGENTA%^The air around "+caster->QCN+" takes on a dull hum!", caster);
+            wall=new("/d/magic/obj/sonicshield.c");
+          break;
+          default:
+            tell_object(caster,"%^MAGENTA%^%^BOLD%^A massive ring of violet fire rises up around you.");
+            tell_room(place,"%^MAGENTA%^%^BOLD%^A massive ring of violet fire rises up around "+caster->QCN+"!", caster);
+            wall=new("/d/magic/obj/firewall.c");
+          break;
+        }
+        wall->set_property("spell",TO);
+        wall->set_property("spelled", ({TO}) );
+        wall->move(place);
+        wall->surround(caster,TO);
+        return;
+    }
+    switch(element) {
+      case "acid": wall=new("/d/magic/obj/vaporcloud.c"); break;
+      case "cold": wall=new("/d/magic/obj/frostcloud.c"); break;
+      case "electricity": wall=new("/d/magic/obj/staticfield.c"); break;
+      case "sonic": wall=new("/d/magic/obj/sonicshield.c"); break;
+      default: wall=new("/d/magic/obj/firewall.c"); break;
+    }
+    wall->set_property("spell",TO);
+    wall->set_property("spelled", ({TO}) );
+    wall->block(caster,arg);
+    if (objectp(wall)) wall->move(place);
+    else return;
+
+    switch(element) {
+      case "acid":
+        tell_room(place,"%^GREEN%^A cloud of hissing vapor rises up, blocking the "+arg+"!");
+      break;
+      case "cold":
+        tell_room(place,"%^CYAN%^A cloud of chilling air rises up, blocking the "+arg+"!");
+      break;
+      case "electricity":
+        tell_room(place,"%^ORANGE%^The air around you seems to come to life, and arcs of %^YELLOW%^el%^WHITE%^e%^YELLOW%^ctri%^WHITE%^c%^YELLOW%^ity %^RESET%^%^ORANGE%^crackle before the "+ arg+".%^RESET%^");
+      break;
+      case "sonic":
+        tell_room(place,"%^MAGENTA%^The air near the "+arg+" takes on a dull hum!");
+      break;
+      default:
+        tell_room(place,"%^BOLD%^%^MAGENTA%^A wall of blazing violet flames rises up, blocking the "+arg+"!");
+      break;
+    }
+    outside = find_object_or_load(place->query_exit(arg));
+    ins = outside->query_exits();
+    for (i=0;i<sizeof(ins);i++) {
+      if(base_name(place) == (string)outside->query_exit(ins[i]) || base_name(place)+".c" == (string)outside->query_exit(ins[i]) || base_name(place) == (string)outside->query_exit(ins[i])+".c") {
+            switch(element) {
+              case "acid": wall2=new("/d/magic/obj/vaporcloud.c"); break;
+              case "cold": wall2=new("/d/magic/obj/frostcloud.c"); break;
+              case "electricity": wall2=new("/d/magic/obj/staticfield.c"); break;
+              case "sonic": wall2=new("/d/magic/obj/sonicshield.c"); break;
+              default: wall2=new("/d/magic/obj/firewall.c"); break;
+            }
+            wall2->set_property("spell",TO);
+            wall2->block(caster,ins[i]);
+            wall2->move(outside);
+            switch(element) {
+              case "acid":
+                tell_room(outside,"%^GREEN%^A cloud of hissing vapor rises up, blocking the "+ins[i]+"!\n%^BOLD%^%^GREEN%^Acid spits out of the cloud towards you!");
+              break;
+              case "cold":
+                tell_room(outside,"%^CYAN%^A cloud of chilling air rises up, blocking the "+ins[i]+"!\n%^BOLD%^%^CYAN%^Shards of frost spit out of the cloud towards you!");
+              break;
+              case "electricity":
+                tell_room(outside,"%^ORANGE%^A crackling field of %^YELLOW%^el%^WHITE%^e%^YELLOW%^ctri%^WHITE%^c%^YELLOW%^ity %^RESET%^%^ORANGE%^appears in the air before the "+ins[i]+".%^RESET%^\n%^YELLOW%^Arcs of static leap out of the field towards you!");
+              break;
+              case "sonic":
+                tell_room(outside,"%^MAGENTA%^The air near the "+ins[i]+" takes on a dull hum!\n%^BOLD%^%^MAGENTA%^Pulses of sound echo towards you!");
+              break;
+              default:
+                tell_room(outside,"%^BOLD%^%^MAGENTA%^A wall of blazing violet flames rises up, blocking the "+ins[i]+"!\n%^BOLD%^%^RED%^Flames spit out of the wall of flame towards you!");
+              break;
+            }
+            burned = all_inventory(outside);
+            for (j=0;j<sizeof(all_inventory(outside));j++) {
+                if ( living(burned[j]) ) {
+                    switch(element) {
+                      case "acid":
+                        tell_room(outside,"%^BOLD%^%^GREEN%^"+burned[j]->QCN+" recoils from the hissing vapor!%^RESET%^",burned[j]);
+                        tell_object(burned[j],"%^BOLD%^%^GREEN%^The vapor burns your skin!%^RESET%^");
+                      break;
+                      case "cold":
+                        tell_room(outside,"%^BOLD%^%^CYAN%^"+burned[j]->QCN+" recoils from the freezing air!%^RESET%^",burned[j]);
+                        tell_object(burned[j],"%^BOLD%^%^CYAN%^The freezing air chills you!%^RESET%^");
+                      break;
+                      case "electricity":
+                        tell_room(outside,"%^YELLOW%^"+burned[j]->QCN+" recoils from the crackling air!%^RESET%^",burned[j]);
+                        tell_object(burned[j],"%^YELLOW%^The charged air crackles across your skin!%^RESET%^");
+                      break;
+                      case "sonic":
+                        tell_room(outside,"%^BOLD%^%^MAGENTA%^"+burned[j]->QCN+" recoils from the humming air!%^RESET%^",burned[j]);
+                        tell_object(burned[j],"%^BOLD%^%^MAGENTA%^The humming air reverberates through you!%^RESET%^");
+                      break;
+                      default:
+                        tell_room(outside,"%^BOLD%^%^RED%^"+burned[j]->QCN+" is struck by the searing-hot flame!",burned[j]);
+                        tell_object(burned[j],"%^RED%^The flames from the wall strike you forcefully, and your skin is coated with a sheet of flame!");
+                      break;
+                    }
+                    limbs = burned[j]->query_limbs();
+                    if(burned[j]->query_property("undead")) damage_targ(burned[j],limbs[random(sizeof(limbs))],(4+random(13)),element);
+                    else damage_targ(burned[j],limbs[random(sizeof(limbs))],(2+random(7)),element);
+                }
+            }
+            break;
+      }
+    }
+    call_out("concentration",4);
+    return;
+}
+
+void concentration() {
+    int flag = 0;
+    if ( caster->query_paralyzed() ||
+         !objectp(wall) ||
+         !objectp(wall2))
+        flag = 1;
+    if ((int)caster->query_hp() != hpcount) {
+        if ((int)caster->query_hp() < hpcount - 30 ) {
+            tell_room(environment(caster),"%^ORANGE%^"+caster->QCN+" looks as though "+caster->QS+" just lost "+caster->QP+" concentration!",caster);
+            tell_object(caster,"%^YELLOW%^You lose your concentration on maintaining the wall of "+element+" you invoked!");
+            flag = 1;
+        } else
+            hpcount = caster->query_hp();
+    }
+    if (flag)
+        call_out("dest_effect",clevel*3);
+    else
+        call_out("concentration",4);
+    return;
+}
+
+void dest_effect() {
+    if (objectp(wall))
+        wall->remove_wall();
+    if (objectp(wall2))
+        wall2->remove_wall();
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+
+    return;
+}
+#include <spell.h>
+#include <magic.h>
+#include <daemons.h>
+inherit SPELL;
+
+int i, hpcount;
+string tempstr, element;
+object endplace, outside, wall, wall2;
+
+string *dir_listing(string tempfil);
+
+void create() {
+    ::create();
+    set_spell_name("wall of perilous fire");
+    set_spell_level(([ "warlock" : 3 ]));
+    set_spell_sphere("invocation_evocation");
+    set_syntax("cast CLASS wall of perilous fire [on EXIT]");
+    set_damage_desc("fire");
+    set_description("This invocation is quite similar to the mage spell 'wall of fire', save that it is conjured purely "
+"of planar energy. It allows the caster to create a wall of brilliant blue flames around himself, protectively, or in "
+"front of an exit, so all who pass through that exit will be scorched by the flames. Half of the damage done is fire, "
+"but the rest results from supernatural power and cannot be resisted. The warlock who casts this spell must keep "
+"concentration on the wall to maintain its existence, and may type <remove wall> to quench the flames.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_arg_needed();
+    set_helpful_spell(1);
+}
+
+string query_cast_string()
+{
+    tell_object(caster,"%^BOLD%^%^WHITE%^You lift a hand to direct your invocation with a fingertip.%^RESET%^");
+    if(objectp(place)) { tell_room(place,"%^BOLD%^%^WHITE%^"+caster->QCN+" lifts a hand to direct "+caster->QP+" invocation with a fingertip.%^RESET%^",caster); }
+    return "display";
+}
+
+void spell_effect(int prof) {
+    string *outs, *ins, *limbs;
+    object *exits, *inexits, *burned;
+    int i, j, dmg;
+    ::spell_effect();
+
+    hpcount=caster->query_hp();
+    if(arg && arg != "" && arg != " ") arg=lower_case(arg);
+
+    if (member_array(arg,place->query_exits()) < 0) {
+        tell_object(caster,"%^BOLD%^%^CYAN%^As your finger motions out an arc, a ring of %^BOLD%^%^BLUE%^e%^BOLD%^%^CYAN%^er%^BOLD%^%^BLUE%^ie cob%^BOLD%^%^CYAN%^a%^BOLD%^%^BLUE%^lt f%^BOLD%^%^CYAN%^l%^BOLD%^%^BLUE%^ame %^BOLD%^%^CYAN%^rises up around you!%^RESET%^");
+        tell_room(place,"%^BOLD%^%^CYAN%^As "+caster->QP+" finger motions out an arc, a ring of %^BOLD%^%^BLUE%^e%^BOLD%^%^CYAN%^er%^BOLD%^%^BLUE%^ie cob%^BOLD%^%^CYAN%^a%^BOLD%^%^BLUE%^lt f%^BOLD%^%^CYAN%^l%^BOLD%^%^BLUE%^ame %^BOLD%^%^CYAN%^rises up around "+caster->QCN+"!%^RESET%^", caster);
+        wall=new("/d/magic/obj/pfirewall.c");
+        wall->set_property("spell",TO);
+        wall->set_property("spelled", ({TO}) );
+        wall->move(place);
+        wall->surround(caster);
+        return;
+    }
+    wall=new("/d/magic/obj/pfirewall.c");
+    wall->set_property("spell",TO);
+    wall->set_property("spelled", ({TO}) );
+    wall->block(caster,arg);
+    if (objectp(wall)) wall->move(place);
+    else return;
+
+    tell_object(caster,"%^BOLD%^%^CYAN%^As your finger motions out a line, a wall of %^BOLD%^%^BLUE%^e%^BOLD%^%^CYAN%^er%^BOLD%^%^BLUE%^ie cob%^BOLD%^%^CYAN%^a%^BOLD%^%^BLUE%^lt f%^BOLD%^%^CYAN%^l%^BOLD%^%^BLUE%^ame %^BOLD%^%^CYAN%^rises up, blocking the "+arg+"!%^RESET%^");
+    tell_room(place,"%^BOLD%^%^CYAN%^As "+caster->QCN+"'s finger motions out a line, a wall of %^BOLD%^%^BLUE%^e%^BOLD%^%^CYAN%^er%^BOLD%^%^BLUE%^ie cob%^BOLD%^%^CYAN%^a%^BOLD%^%^BLUE%^lt f%^BOLD%^%^CYAN%^l%^BOLD%^%^BLUE%^ame %^BOLD%^%^CYAN%^rises up, blocking the "+arg+"!%^RESET%^",caster);
+    outside = find_object_or_load(place->query_exit(arg));
+    ins = outside->query_exits();
+    for (i=0;i<sizeof(ins);i++) {
+      if(base_name(place) == (string)outside->query_exit(ins[i]) || base_name(place)+".c" == (string)outside->query_exit(ins[i]) || base_name(place) == (string)outside->query_exit(ins[i])+".c") {
+            wall2=new("/d/magic/obj/pfirewall.c");
+            wall2->set_property("spell",TO);
+            wall2->block(caster,ins[i]);
+            wall2->move(outside);
+            tell_room(outside,"%^BOLD%^%^CYAN%^A ring of %^BOLD%^%^BLUE%^e%^BOLD%^%^CYAN%^er%^BOLD%^%^BLUE%^ie cob%^BOLD%^%^CYAN%^a%^BOLD%^%^BLUE%^lt f%^BOLD%^%^CYAN%^l%^BOLD%^%^BLUE%^ame %^BOLD%^%^CYAN%^rises up, blocking the "+ins[i]+"!\n%^BOLD%^%^BLUE%^Waves of heat roll off the wall of fire towards you!%^RESET%^");
+
+            burned = all_inventory(outside);
+            for (j=0;j<sizeof(all_inventory(outside));j++) {
+                if ( living(burned[j]) ) {
+                    tell_room(outside,"%^BOLD%^%^CYAN%^"+burned[j]->QCN+" is burned by the wall's searing heat!%^RESET%^",burned[j]);
+                    tell_object(burned[j],"%^BOLD%^%^CYAN%^The searing heat of the wall of flames burns you badly!%^RESET%^");
+                    limbs = burned[j]->query_limbs();
+                    if(burned[j]->query_property("undead")) dmg = 4+random(13);
+                    else dmg = 2+random(7);
+                    damage_targ(burned[j],limbs[random(sizeof(limbs))],dmg/2,"fire");
+                    damage_targ(burned[j],limbs[random(sizeof(limbs))],dmg/2,"untyped");
+                }
+            }
+            break;
+      }
+    }
+    call_out("concentration",4);
+    return;
+}
+
+void concentration() {
+    int flag = 0;
+    if ( caster->query_paralyzed() ||
+         !objectp(wall) ||
+         !objectp(wall2))
+        flag = 1;
+    if ((int)caster->query_hp() != hpcount) {
+        if ((int)caster->query_hp() < hpcount - 30 ) {
+            tell_room(environment(caster),"%^CYAN%^"+caster->QCN+" looks as though "+caster->QS+" just lost "+caster->QP+" concentration!%^RESET%^",caster);
+            tell_object(caster,"%^CYAN%^You lose your concentration on maintaining the wall of flames you invoked!%^RESET%^");
+            flag = 1;
+        } else
+            hpcount = caster->query_hp();
+    }
+    if (flag)
+        call_out("dest_effect",clevel*3);
+    else
+        call_out("concentration",4);
+    return;
+}
+
+void dest_effect() {
+    if (objectp(wall))
+        wall->remove_wall();
+    if (objectp(wall2))
+        wall2->remove_wall();
+
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+    return;
+}
+// Web
+
+#include <spell.h>
+#include <magic.h>
+
+inherit SPELL;
+
+create()
+{
+    ::create();
+    set_spell_name("wall of stone");
+    set_spell_level(([ "mage" : 5, "druid" : 6, "monk" : 9, "oracle" : 6, "magus" : 5 ]));
+    set_spell_sphere("conjuration_summoning");
+    set_mystery("stone");
+    set_monk_way("way of the elements");
+    set_syntax("cast CLASS wall of stone on EXIT");
+    set_damage_desc("blocks the EXIT");
+    set_description("This command will cause a wall of rubble to appear on an exit, preventing travel in that direction "
+        "until all of the rubble has been cleared away.  The more powerful the caster, the larger the rubble "
+        "wall that must be removed.");
+    set_spell_sphere("conjuration_summoning");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_arg_needed(1);
+    set_components(([
+      "mage" : ([ "granite dust":1, ]),
+    ]));
+    set_helpful_spell(1);
+}
+
+string query_cast_string()
+{
+    return "%^YELLOW%^"+caster->QCN+" suddenly yells in rage and stomps "+caster->QP+" foot hard on the ground!";
+}
+
+int preSpell()
+{
+    if(place->query_property("wall of stone"))
+    {
+        tell_object(caster,"%^BOLD%^There is already a wall of stone here, you can't create another!");
+        return 0;
+    }
+    if(!arg || (member_array(arg,(string*)place->query_exits()) == -1))
+    {
+        tell_object(caster,"%^BOLD%^You need to specify an exit from this room.");
+        return 0;
+    }
+    return 1;
+}
+
+
+void spell_effect(int prof)
+{
+    tell_object(caster,"%^ORANGE%^You can feel the earth begin to tremble as it heeds your command!");
+    tell_room(place,"%^ORANGE%^The earth begins to tremble as it heeds "+caster->QCN+"'s command!",caster);
+
+    spell_successful();
+    call_out("block_exit",4,arg);
+}
+
+
+void block_exit(string exit)
+{
+    tell_room(place,"%^BOLD%^A small mountain of stone rushes up from the ground, blocking the "+arg+"!");
+    place->collapse_exit(arg,(clevel+5)*20);
+    place->set_property("wall of stone",1);
+}
+
+void dest_effect()
+{
+    if(objectp(place)) { place->remove_property("wall of stone"); }
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+
+    return;
+}
+//      Wall of fire
+
+#include <spell.h>
+#include <magic.h>
+#include <daemons.h>
+
+inherit SPELL;
+
+int i, hpcount;
+string tempstr;
+object endplace, outside, wall, wall2;
+
+string *dir_listing(string tempfil);
+
+void create()
+{
+    ::create();
+    set_spell_name("wall of thorns");
+    set_spell_level(([ "druid" : 5, "oracle":5]));
+    set_domains("plant");
+    set_mystery("nature");
+    set_spell_sphere("invocation_evocation");
+    set_damage_desc("piercing");
+    set_syntax("cast CLASS wall of thorns [on EXIT] | cast CLASS wall of thorns");
+
+    set_description("The spell wall of thorns will create a massive wall of tangled thorn bushes that will "
+        "damage anyone going through an exit, or optionally, damage anyone who attacks the caster.  If "
+        "no arguments are given to the spell, the wall of thorns will surround the caster and damage anyone "
+        "who attacks him or her.  The caster may type <remove wall> to end the wall of thorns spell early.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_arg_needed();
+    set_helpful_spell(1);
+}
+
+
+string query_cast_string()
+{
+    return "%^GREEN%^"+caster->QCN+" flings a handfull of seeds into the air and where they land "
+        "a massive wall of twisted, razor-sharp thorns sprouts up!";
+}
+
+
+void spell_effect(int prof)
+{
+    string *outs, *ins, *limbs, arg;
+    object *exits, *inexits, *burned;
+    int i, j;
+    ::spell_effect();
+    //caster=CASTER;
+    hpcount=caster->query_hp();
+    //place=PLACE;
+    if(arg && arg != "" && arg != " ") { arg=lower_case(arg); }
+    if (member_array(arg,place->query_exits()) < 0)
+    {
+        tell_object(caster,"%^GREEN%^A thick wall of tangled thorns sprouts up around you!");
+        tell_room(place,"%^GREEN%^A thick wall of tangled thorns sprouts up around "+caster->QCN+"!",caster);
+        wall=new("/d/magic/obj/thornwall.c");
+        wall->set_property("spell",TO);
+        wall->set_property("spelled", ({TO}) );
+        wall->move(place);
+        wall->surround(caster);
+        return;
+    }
+    wall=new("/d/magic/obj/thornwall.c");
+    wall->set_property("spell",TO);
+    wall->set_property("spelled", ({TO}) );
+    wall->block(caster,arg);
+    if (objectp(wall))
+        wall->move(place);
+    else
+        return;
+
+    tell_room(place,"%^GREEN%^A wall of tangled thorns sprouts up, blocking the "+arg+"!");
+
+    outside = find_object_or_load(place->query_exit(arg));
+    ins = outside->query_exits();
+
+    for (i=0;i<sizeof(ins);i++)
+    {
+        if ( base_name(place) == (string)outside->query_exit(ins[i]) || base_name(place)+".c" == (string)outside->query_exit(ins[i]) || base_name(place) == (string)outside->query_exit(ins[i])+".c")
+        {
+            wall2=new("/d/magic/obj/thornwall.c");
+            wall2->set_property("spell",TO);
+            wall2->block(caster,ins[i]);
+            wall2->move(outside);
+
+            tell_room(outside,"%^GREEN%^A wall of tangled thorns sprouts up, blocking the "+ins[i]+"!  The tangled mass grows so fast that you are caught up in it!");
+
+            burned = all_inventory(outside);
+            for (j=0;j<sizeof(all_inventory(outside));j++)
+            {
+                if ( living(burned[j]) )
+                {
+                    if ( burned[j]->query_property("strength") && strsrch(burned[j]->query_property("strength"), "thorns") != -1 )
+                    {
+                        tell_object(burned[j],"%^GREEN%^The thorns part around you, leaving you unharmed!");
+                        tell_room(outside,"%^GREEN%^The thorns part around "+burned[j]->QCN+" leaving "+burned[j]->QO+" unharmed.",burned[j]);
+                    }
+                    else
+                    {
+                        tell_object(burned[j],"%^GREEN%^The thorns tear into your body!");
+                        tell_room(outside,"%^GREEN%^The thorns tear into "+burned[j]->QCN+"'s body!",burned[j]);
+                        limbs = burned[j]->query_limbs();
+                        if ( !burned[j]->query_property("undead") )
+                            damage_targ(burned[j],limbs[random(sizeof(limbs))],(4+random(13)),"piercing" );
+                        else
+                            damage_targ(burned[j],limbs[random(sizeof(limbs))],(2+random(7)),"piercing" );
+                    }
+                }
+            }
+            break;
+        }
+    }
+    call_out("concentration",4);
+    return;
+}
+
+
+void concentration() {
+    int flag = 0;
+    if ( caster->query_paralyzed() || !objectp(wall) || !objectp(wall2))
+        flag = 1;
+    if ((int)caster->query_hp() != hpcount)
+    {
+        if ((int)caster->query_hp() < hpcount - 30 )
+        {
+            tell_room(environment(caster),"%^ORANGE%^"+caster->QCN+" looks as though "+caster->QS+" just lost "+caster->QP+" concentration!",caster);
+            tell_object(caster,"%^YELLOW%^You lose your concentration on maintaining the wall of thorns!");
+            flag = 1;
+        }
+        else
+            hpcount = caster->query_hp();
+    }
+    if (flag)
+        call_out("dest_effect",clevel*3);
+    else
+        call_out("concentration",4);
+    return;
+}
+
+
+void dest_effect()
+{
+    if (objectp(wall))
+        wall->remove_wall();
+    if (objectp(wall2))
+        wall2->remove_wall();
+
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+    return;
+}
+#include <priest.h>
+
+inherit SPELL;
+
+void create()
+{
+    ::create();
+    set_spell_name("wall walker");
+    set_spell_level( ([ "psywarrior" : 2 ]) );
+    set_spell_sphere("alteration");
+    set_syntax("cast CLASS wall walker");
+    set_description("With this power, the caster becomes able to walk on walls and even ceilings and greatly enhances their ability to climb.");
+    set_helpful_spell(1);
+}
+
+int preSpell()
+{
+    if(caster->query_property("spider climb"))
+    {
+        tell_object(caster, "You are already affected by a similar spell.");
+        return 0;
+    }
+    return 1;
+}
+
+string query_cast_string()
+{
+    tell_object(caster, "%^CYAN%^BOLD%^You focus inwardly with your mind and begin to change your body.%^RESET%^");
+    tell_room(place, "%^CYAN%^BOLD%^" + caster->query_cap_name() + " focuses inwardly with " + caster->query_possessive() + " mind.%^RESET%^");
+    return "display";
+}
+
+void spell_effect(int prof)
+{
+    tell_object(caster, "%^BOLD%^You change the makeup of your body to adhere to surfaces. You can now climb with superhuman ability!%^RESET%^");
+    tell_room(place, "%^BOLD%^" + caster->query_cap_name() + " seems to change the very makeup of their body.%^RESET%^");
+    caster->set_property("spider climb", 1);
+    spell_successful();
+    addSpellToCaster();
+    spell_duration = 900 + (clevel + roll_dice(1, 20)) * 10;
+    set_end_time();
+    call_out("dest_effect", spell_duration);
+}
+
+void dest_effect()
+{
+    if(objectp(caster))
+    {
+        caster->remove_property("spider climb");
+        tell_object(caster, "%^CYAN%^The ability to walk on walls fades from you.%^RESET%^");
+    }
+    ::dest_effect();
+    if(objectp(this_object()))
+        this_object()->remove();
+}
+#include <std.h>
+#include <daemons.h>
+#include <magic.h>
+inherit SPELL;
+
+int bonus;
+
+void create() {
+    ::create();
+    set_author("nienne");
+    set_spell_name("wandering star motes");
+    set_spell_level(([ "bard" : 4 ]));
+    set_spell_sphere("illusion");
+    set_syntax("cast CLASS wandering star motes on TARGET");
+    set_damage_desc("clevel / 5 + 1 to ac");
+    set_description("This spell creates a swarm of sparkling motes of light, that shoot towards the target and swirl around "
+"it in a complex pattern.  It makes the target easier to hit with melee combat, and also makes it impossible for the target "
+"to hide by magical or other means until the spell expires or is dispelled.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_target_required(1);
+    set_heart_beat(1);
+}
+
+void heart_beat()
+{
+    if(!objectp(target)) { dest_effect(); return; }
+    if(!objectp(caster)) { return; }
+    if(target->query_invis())
+    {
+        tell_object(target,"%^BOLD%^%^WHITE%^The brilliant motes of light give away your position!");
+        target->set_invis(0);
+        return;
+    }
+    return;
+}
+
+string query_cast_string()
+{
+    tell_object(caster,"%^YELLOW%^Sparkling motes of light gather"+
+		" in your hands as you lift your voice in song.");
+    tell_room(place,"%^YELLOW%^Sparkling motes of light gather"+
+		" in "+caster->QCN+"'s hands as "+caster->QS+" chants in a"+
+		" singsong voice.",caster);
+    return "display";
+}
+
+int preSpell()
+{
+    if(!objectp(target))
+    {
+        tell_object(caster,"You need a target for this spell.");
+        return 0;
+    }
+    if((int)target->query_property("faerie fire"))
+    {
+        tell_object(caster,"%^MAGENTA%^The target is already outlined in light!");
+        return 0;
+    }
+    return 1;
+}
+
+void spell_effect(int prof)
+{
+    int duration;
+
+    duration = (ROUND_LENGTH * 10) * clevel;
+    bonus = clevel / 5 + 1;
+
+    if(!present(target,place))
+    {
+        tell_object(caster,"Your target has left the area.");
+        dest_effect();
+        return;
+    }
+    tell_object(caster,"%^BOLD%^%^WHITE%^You gesture towards "+target->QCN+""+
+                " engulfing "+target->QO+" in a swarm of bright, swirling motes!%^RESET%^");
+    tell_object(target,"%^BOLD%^%^WHITE%^With a simple gesture towards you, "+caster->QCN+""
+                " engulfs you in a swarm of bright, swirling motes!%^RESET%^");
+    tell_room(place,"%^BOLD%^%^WHITE%^With a simple gesture "+caster->QCN+" "+
+		"engulfs "+target->QCN+" in a swarm of bright, swirling motes!%^RESET%^",({target,caster}));
+     spell_successful();
+    target->add_ac_bonus(-1*bonus);
+    target->set_property("faerie fire",1);
+    target->set_property("spelled",({TO}));
+    target->set_property("added short",({"%^BOLD%^%^WHITE%^ (glowing)%^RESET%^"}));
+    addSpellToCaster();
+    spell_duration = duration;
+    set_end_time();
+    call_out("dest_effect",duration);
+
+}
+
+void dest_effect()
+{
+    if(objectp(target))
+    {
+	    tell_room(place,"%^YELLOW%^The gleaming motes of light "+
+		    "around "+target->QCN+" fade away.");
+	    tell_object(target,"%^YELLOW%^The gleaming motes of "+
+		    "light around you fade away.");
+	    target->remove_property("faerie fire");
+	    target->remove_property_value("added short",({"%^BOLD%^%^WHITE%^ (glowing)%^RESET%^"}));
+        target->add_ac_bonus(bonus);
+    }
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+
+}
+#include <priest.h>
+#define SENDOBJ "/d/magic/obj/warlock_send_ob"
+inherit SPELL;
+
+object who,send_ob;
+string whoname, whocname, cname, Ccname;
+
+void create() {
+    ::create();
+    set_spell_name("warlocks call");
+    set_spell_level(([ "warlock" : 2 ]));
+    set_spell_sphere("divination");
+    set_syntax("cast CLASS warlocks call to TARGET");
+    set_description("This invocation allows a brief message to be sent to the target (less than 200 characters). "
+". Doing so opens the warlock up to a response from the target - either a message of a similarly short nature, or "
+"a harmful retort of mental energy. If either message is too long, or either party takes more than a minute to "
+"respond, the invocation will dissipate harmlessly. If the target is ignoring the warlock or incapacitated in some "
+"way, the invocation will fail.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_non_living_ok(0);
+    set_arg_needed();
+    set_silent_casting(1);
+    set_helpful_spell(1);
+}
+
+void spell_effect(int prof) {
+    string arg;
+    string *ignored, *casterallowed, *targallowed;
+
+    arg = lower_case(ARG);
+    if (!(who = find_player(caster->realNameVsProfile(arg)))) {
+        tell_object(CASTER,capitalize(arg)+" cannot be found to establish a link.\n");
+        TO->remove();
+        return;
+    }
+    cname = CASTER->query_name();
+    whoname = who->query_name();
+    whocname = who->QCN;
+    Ccname = CASTER->QCN;
+    if (avatarp(who) && !who->query_disguised()) {
+        tell_object(CASTER,capitalize(arg)+" cannot be found to establish a link.\n");
+        TO->remove();
+        return;
+    }
+   if(avatarp(who) && arg == (string)who->query_true_name()) {
+      tell_object(CASTER,capitalize(arg)+" cannot be found to establish a link.\n");
+      TO->remove();
+      return;
+   }
+    if (arg == cname) {
+        tell_object(CASTER,"You cannot establish a link with yourself.\n");
+        TO->remove();
+        return;
+    }
+    if (who->query_invis() && (int)who->query_level() > (int)CASTER->query_level()) {
+        tell_object(CASTER,capitalize(arg)+" cannot be found to establish a link.\n");
+        TO->remove();
+        return;
+    }
+    if (who->is_player() && !interactive(who)) {
+        tell_object(CASTER, who->QCN+" is link-dead and cannot hear you.\n");
+        TO->remove();
+        return;
+    }
+    if (who->query_blocked("tell")) {
+        write(who->QCN+" is currently blocking all tells.");
+        TO->remove();
+        return;
+    }
+    ignored = who->query_ignored();
+    if (!ignored) {
+        who->reset_ignored();
+        ignored = who->query_ignored();
+    }
+    if ((member_array(cname, ignored) != -1)) {
+        tell_object(CASTER, who->QCN+" is ignoring you.\n");
+        TO->remove();
+        return;
+    }
+    casterallowed = CASTER->query_property("allowed tell");
+    targallowed = who->query_property("allowed tell");
+    if (!casterallowed) casterallowed = ({});
+    if (!targallowed) targallowed = ({});
+    if (member_array(cname,targallowed) != -1
+        && member_array(whoname,casterallowed) != -1) {
+        tell_object(CASTER,"You already have a mental link with "+who->QCN+".\n");
+        TO->remove();
+        return;
+    }
+    if(present("warlock_send_ob_xxx",CASTER)) {
+        tell_object(CASTER,"You are already sending a message to someone.\n");
+        TO->remove();
+        return;
+    }
+    tell_object(CASTER, "%^CYAN%^You ready your mind to send a message to "+who->QCN+".");
+    send_ob = new(SENDOBJ);
+    send_ob->set_receiver(who);
+    send_ob->set_teller(CASTER);
+    send_ob->move(CASTER);
+    CASTER->set_property("spelled",({TO}));
+    spell_duration = 60;
+    set_end_time();
+    call_out("dest_effect",spell_duration);
+}
+
+void dest_effect() {
+    if(objectp(CASTER)){
+       tell_object(CASTER,"The ability to communicate with "+whocname+" fades from your mind.");
+       if(objectp(send_ob)) send_ob->remove();
+    }
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+}
+#include <std.h>
+#include <clock.h>
+#include <magic.h>
+
+#define WTROB "/d/magic/obj/breathob.c"
+
+inherit SPELL;
+object breathob;
+
+void create(){
+    ::create();
+    set_spell_name("water breathing");
+    set_spell_level(([ "mage" : 3, "cleric" : 3, "oracle" : 3, "druid" : 3, "psywarrior" : 1, "psion" : 1, "magus" : 3 ]));
+    set_mystery("waves");
+    set_spell_sphere("alteration");
+    set_syntax("cast CLASS water breathing on TARGET");
+    set_description("This spell allows the target to breathe water for a limited period of time.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_target_required(1);
+	set_helpful_spell(1);
+}
+
+int preSpell(){
+    if(present("underwtr_breath_ob", target)){
+      tell_object(caster, target->QCN+" can already breathe water.");
+      return 0;
+    }
+    return 1;
+}
+
+void spell_effect(int prof) {
+    if (environment(target)!=place) {
+      tell_object(caster,"%^BOLD%^Your target has left the area!");
+      TO->remove();
+      return;
+    }
+
+    spell_successful();
+    tell_room(environment(caster), "%^BOLD%^%^CYAN%^"+caster->QCN+" touches "+target->QCN+"'s nose and mouth lightly.", ({caster, target}) );
+    tell_object(caster, "%^BOLD%^%^CYAN%^You give "+target->QCN+" the ability to breathe water.");
+    tell_object(target, "%^BOLD%^%^CYAN%^"+caster->QCN+" gives you the power to breathe water.");
+
+    breathob = new(WTROB);
+    spell_duration = (clevel + roll_dice(1, 20)) * ROUND_LENGTH;
+    set_end_time();
+    breathob->set_maxtime(spell_duration);
+    breathob->set_property("spell", TO);
+    breathob->set_property("spelled", ({TO}));
+    addSpellToCaster();
+    breathob->move(target);
+}
+
+void dest_effect(){
+    tell_object(target, "%^BOLD%^%^CYAN%^You feel the power to breathe water leave you.");
+    if(objectp(breathob))
+      breathob->remove();
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+
+}
+
+void reverse_spell(){
+    spell_effect(-100);
+}
+#include <std.h>
+#include <daemons.h>
+#include <spell.h>
+#include <magic.h>
+
+
+inherit SPELL;
+
+void create() {
+    ::create();
+    set_spell_name("waves of exhaustion");
+    set_spell_level(([ "mage" : 7, "nightblade":6]));
+    set_mystery("bones");
+    set_domains(({"repose"}));
+    set_spell_sphere("necromancy");
+    set_syntax("cast CLASS waves of exhaustion");
+    set_damage_desc("exhaustion to living");
+    set_description("This spell sends waves of necrotic energy at everyone living in sight, exhausting them.");
+    set_verbal_comp();
+    set_somatic_comp();
+    splash_spell(3);
+}
+
+string query_cast_string() {
+    return "%^BLUE%^"+caster->QCN+" spells an incantation in eldritch tongue.";
+}
+
+void spell_effect(int prof){
+    object *attackers;
+    int i,admg;
+    attackers = target_selector();
+
+    tell_room(place, "%^BOLD%^%^BLACK%^" + caster->QCN + " raises hand and releases waves of darkness!%^RESET%^");
+    if (!sizeof(attackers)) {
+        tell_object(caster, "%^BOLD%^%^BLACK%^The area is washed in fell waves but nothing else happens.%^RESET%^");
+        dest_effect();
+        return;
+    }
+
+    for (i = 0; i < sizeof(attackers); i++) {
+        if (!objectp(attackers[i])) {
+            continue;
+        }
+        "/std/effect/status/exhausted"->apply_effect(attackers[i], clevel / 14 + 1);
+    }
+    spell_successful();
+    dest_effect();
+}
+
+void dest_effect(){
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+}
+#include <std.h>
+#include <daemons.h>
+#include <spell.h>
+#include <magic.h>
+
+
+inherit SPELL;
+
+void create() {
+    ::create();
+    set_spell_name("waves of fatigue");
+    set_spell_level(([ "mage" : 5,"cleric":5,"warlock" : 3 , "nightblade":5]));
+    set_domains("renewal");
+    set_spell_sphere("necromancy");
+    set_syntax("cast CLASS waves of fatigue");
+    set_damage_desc("fatigue to living");
+    set_description("This spell sends waves of necrotic energy at everyone living in sight, fatiguing them.");
+    set_verbal_comp();
+    set_somatic_comp();
+    splash_spell(3);
+    set_feats_required(([ "warlock" : "tome of ancient secrets"]));
+}
+
+string query_cast_string() {
+    return "%^BLUE%^"+caster->QCN+" spells an incantation in eldritch tongue.";
+}
+
+void spell_effect(int prof){
+    object *attackers;
+    int i,admg;
+    attackers = target_selector();
+
+    tell_room(place,"%^BOLD%^%^BLACK%^"+caster->QCN+" raises hand and releases waves of darkness!%^RESET%^");
+    if(!sizeof(attackers)){
+        tell_object(caster,"%^BOLD%^%^BLACK%^The area is washed in fell waves but nothing else happens.%^RESET%^");
+        dest_effect();
+        return;
+    }
+
+    for(i=0;i<sizeof(attackers);i++)
+    {
+        if(!objectp(attackers[i]))
+            continue;
+        "/std/effect/status/fatigued"->apply_effect(attackers[i],clevel/14+1);
+    }
+    spell_successful();
+    dest_effect();
+}
+
+void dest_effect(){
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+}
+//_wave_of_pain.c
+#include <std.h>
+#include <daemons.h>
+inherit SPELL;
+
+void create() {
+    ::create();
+    set_spell_name("wave of pain");
+    set_spell_level(([ "mage" : 3, "bard":3, "nightblade":5]));
+    set_spell_sphere("illusion");
+    set_syntax("cast CLASS wave of pain");
+    set_damage_desc("untyped");
+    set_description("Through this spell, the caster sends out a great wave of pain that can harm, kill, and/or paralyze "
+"all in its path.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_save("will");
+    splash_spell(3);
+}
+
+string query_cast_string()
+{
+ 	tell_object(caster,"%^BOLD%^%^RED%^The air around you begins to"+
+		" ripple outwards as you chant in a low prayer.");
+	tell_room(place,"%^BOLD%^%^RED%^The air around "+caster->QCN+" "+
+		"begins to ripple outward as "+caster->QS+" chants a "+
+		"low prayer.",caster);
+	return "display";
+}
+
+void spell_effect(int prof)
+{
+    object *inven;
+    int i,j;
+
+    inven = target_selector();
+
+    inven -= ({caster});
+
+    tell_room(place,"%^RED%^In a violent movement, "+caster->QCN+" thrusts "+caster->QP+" hands outward, "
+        "sending a wave of pain and torturous attacks into the surrounding world.",caster);
+    tell_object(caster,"%^RED%^You thrust your hands outward, sending a violet, agony filled wave "
+        "into the surrounding world.");
+
+    j = sizeof(inven);
+
+    for (i=0;i<j;i++) {
+        if (!objectp(inven[i])) continue;
+        tell_object(inven[i],"%^RED%^You are struck with a horrible pain.");
+        damage_targ(inven[i],"torso",sdamage,"untyped");
+
+        if(!do_save(inven[i],0)) {
+            tell_object(inven[i],"%^RED%^The pain is too much, forcing you to your knees then "
+                "to the ground writhing.");
+            tell_room(place,"%^RED%^The pain is too much for "+inven[i]->QCN+", "
+                "as "+inven[i]->QS+" falls to the ground writhing.",inven[i]);
+            inven[i]->set_paralyzed(8 * roll_dice(1, 2),"%^BOLD%^%^BLACK%^You are writhing in torment");
+
+        }
+    }
+    tell_object(caster,"%^BOLD%^%^BLACK%^Your feel a sense of satisfaction with"+
+		" the pain you have inflicted.");
+    caster->force_me("emote looks about with a pleased smirk.");
+    dest_effect();
+}
+
+void dest_effect()
+{
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+
+}
+//~Circe~ 7/29/05
+#include <std.h>
+#include <priest.h>
+
+#define TYPES ({"sword","staff","battleaxe"})
+
+inherit SPELL;
+
+object mywpn;
+
+
+void create() 
+{
+    ::create();
+    set_spell_name("weapon of energy");
+    set_spell_level(([ "psion" : 1, "psywarrior" : 1 ]));
+    set_spell_sphere("combat");
+    set_syntax("cast CLASS weapon of energy on <sword|staff|battleaxe>");
+    set_description("This power allows the psion to create a weapon made purely of energy and his psychic power.  The "
+        "weapon may take one of three forms - sword, staff, or axe - chosen by the psion at the time of manifesting.  The weapon "
+        "must be wielded as a normal weapon. If no choice is made, the weapon will automatically take the form of a sword.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_arg_needed();
+    set_helpful_spell(1);
+}
+
+
+string query_cast_string() 
+{
+    return "%^BOLD%^%^RED%^"+caster->QCN+" closes "+caster->QP+" "+
+        "eyes, clasping "+caster->QP+" hands before "+caster->QO+".";
+}
+
+
+void spell_effect(int prof)
+{
+    if (!objectp(caster))
+    {
+        dest_effect();
+        return;
+    }
+    
+    if(!arg) arg = "sword";
+    
+    if(member_array(arg,TYPES) == -1)
+    {
+        tell_object(caster,"That is not a valid type!  You must "+
+        "choose sword, staff, or battleaxe.");
+        TO->remove();
+        return;
+    }
+    
+    if (interactive(caster))
+    {
+        tell_object(caster, "%^BOLD%^%^CYAN%^A "+arg+" made of pure "+
+            "energy materializes in your hands as you concentrate!");
+    }
+    
+    tell_room(place,"%^BOLD%^%^CYAN%^A dazzling light begins to "+
+        "glow within "+caster->QCN+"'s hands, taking the shape of "+
+        "a "+arg+"!",caster);
+        
+    mywpn = new("/d/magic/obj/psion_weapon");
+    mywpn->make_me(""+arg+"");
+    mywpn->move(caster);
+    
+    caster->remove_paralyzed();
+    caster->force_me("wield weapon");
+    spell_successful();
+}
+
+
+void dest_effect() 
+{
+    if (objectp(mywpn) && objectp(caster)) 
+    {
+        tell_object(caster,"%^BOLD%^%^RED%^The energy forming the "+
+            "weapon disperses, causing the weapon to vanish.");
+        tell_room(environment(caster),"%^BOLD%^%^RED%^The weapon "+
+            "in "+caster->QCN+"'s hand fades away.",caster);
+        mywpn->remove();
+    }
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+}
+#include <spell.h>
+#include <magic.h>
+
+inherit SPELL;
+
+object oldenv, web, mass;
+int waittime;
+
+void dest_effect();
+void waiter(int num);
+
+create()
+{
+    ::create();
+    set_spell_name("web");
+    set_spell_level(([ "mage" : 2, "assassin" : 2, "psion" : 3, "magus" : 2, "nightblade":2]));
+    set_spell_sphere("conjuration_summoning");
+    set_discipline("shaper");
+    set_syntax("cast CLASS web on TARGET");
+    set_damage_desc("tripped for 3d4 rounds");
+    set_description("When a victim is unfortunate enough to be victim of a web spell, he/she might as well get a new hobby. If the web is successful, the victim will be immobilized within a massive web.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_target_required(1);
+    set_save("reflex");
+}
+
+string query_cast_string()
+{
+    return caster->QCN + " steps away from " + target->QCN + " and starts a low chant.";
+}
+
+spell_effect(int prof)
+{
+    int save, neededroll, power;
+    string strength;
+    tell_object(caster, "%^YELLOW%^You jab your finger at " + target->QCN + " and strands of sticky web shoot out towards " + target->QO + "!");
+    tell_object(target, "%^YELLOW%^" + caster->QCN + " jabs " + caster->QP + " finger at you, shooting out strands of sticky web!");
+    tell_room(place, "%^YELLOW%^" + caster->QCN + " jabs " + caster->QP + " finger at " + target->QCN + ", shooting out strands of sticky web!", ({ caster, target }));
+    if ((do_save(target, -2) || !target->set_tripped(roll_dice(3, 4)))) {
+        tell_object(caster, "%^BOLD%^%^RED%^" + target->QCN + " manages to dodge your mass of webs!");
+        tell_object(target, "%^BOLD%^%^RED%^You manage to dodge the mass of webs!");
+        tell_room(environment(caster), "%^BOLD%^%^RED%^" + target->QCN + " manages to dodge the mass of webs!", ({ caster, target }));
+    } else {
+        strength = "furiously wrap around";
+        spell_successful();
+        tell_object(caster, "%^BOLD%^%^RED%^Your mass of webs " + strength + " " + target->QCN + " trapping " + target->QP + " legs!");
+        tell_object(target, "%^BOLD%^%^RED%^" + caster->QCN + "'s mass of webs " + strength + " you, trapping your legs!");
+        tell_room(place, "%^BOLD%^%^RED%^" + caster->QCN + "'s mass of webs " + strength + " " + target->QCN + " trapping " + target->QP + " legs!", ({ caster, target }));
+    }
+    spell_successful();
+}
+#include <std.h>
+#include <daemons.h>
+#include <spell.h>
+#include <magic.h>
+
+
+inherit SPELL;
+
+void create()
+{
+    ::create();
+    set_spell_name("weird");
+    set_spell_level(([ "mage" : 9, "oracle" : 9 ]));
+    set_mystery("whimsy");
+    set_spell_sphere("illusion");
+    set_syntax("cast CLASS weird");
+    set_damage_desc("mental, cowering");
+    set_description("With this spell, caster extends fears and horrors of own mind into material plane, causing pain and suffering to everything in sight. Only a strong will can withstand this power, and only to avoid some of the suffering..");
+    set_verbal_comp();
+    set_somatic_comp();
+    splash_spell(2);
+    set_save("will");
+}
+
+string query_cast_string()
+{
+    return "%^CYAN%^" + caster->QCN + " speaks words of arcane horror.";
+}
+
+void spell_effect(int prof)
+{
+    object* attackers;
+    int i, admg;
+    attackers = target_selector();
+
+    tell_room(place, "%^BOLD%^%^BLUE%^" + caster->QCN + " raises " + caster->QP + " hands and releases waves of horrific images!%^RESET%^");
+    if (!sizeof(attackers)) {
+        tell_object(caster, "%^BOLD%^%^BLUE%^The place is filled with images of horrors, but nothing happens.%^RESET%^");
+        dest_effect();
+        return;
+    }
+
+    for (i = 0; i < sizeof(attackers); i++) {
+        if (!objectp(attackers[i])) {
+            continue;
+        }
+        define_base_damage(0);
+        admg = sdamage;
+        if (do_save(target) || random(3)) {
+            if (evade_splash(attackers[i])) {
+                continue;
+            }
+            admg = admg / 2;
+        }else {
+            "/std/effect/status/cowering"->apply_effect(attackers[i], clevel / 18 + 1);
+        }
+        tell_object(attackers[i], "%^CYAN%^%^BOLD%^Your mind is filled with images of suffering!%^RESET%^");
+        damage_targ(attackers[i], attackers[i]->return_target_limb(), admg, "mental");
+    }
+    spell_successful();
+    dest_effect();
+}
+
+void dest_effect()
+{
+    ::dest_effect();
+    if (objectp(TO)) {
+        TO->remove();
+    }
+}
+#include <spell.h>
+#include <daemons.h>
+inherit SPELL;
+int bonus;
+
+int feattracker;
+
+string *valid_forms()
+{
+    return ({"wererat","rat",});
+}
+
+void create()
+{
+    ::create();
+    set_spell_name("wererat shape");
+    set_spell_level(([ "innate" : 1 ]));
+    set_spell_sphere("alteration");
+    set_syntax("cast CLASS wererat shape on wererat|rat");
+    set_description("With this power infected with the wererat plague can morph at will into a powerful, sneaky hybrid wererat form, resembling a larger, more powerful, version of a ratkin, or into a form of a dire rat.
+
+%^BOLD%^%^RED%^N.B.%^RESET%^ You can set alternative description, speech string and adjective for these forms.
+
+%^BOLD%^%^RED%^See also:%^RESET%^ wererat, ratkin");
+    set_arg_needed();
+    set_helpful_spell(1);
+}
+
+int preSpell()
+{
+    object shape;
+    if(objectp(shape = caster->query_property("shapeshifted")) ||
+       objectp(shape = caster->query_property("altered")))
+    {
+        tell_object(caster,"You are already in an alternative form!");
+        return 0;
+    }
+    if(member_array(arg,valid_forms())==-1)
+    {
+        tell_object(caster,"Invalid form, valid forms are: "+implode(valid_forms(),", "));
+        return;
+    }
+    return 1;
+}
+
+void spell_effect(int prof)
+{
+    object shape;
+    if (!objectp(caster)){
+        TO->remove();
+        return;
+    }
+    new("/std/races/shapeshifted_races/wererat_"+arg+".c")->init_shape(caster,arg);
+
+    if(caster->query_property("shapeshifted"))
+        shape = caster->query_property("shapeshifted");
+    else
+        shape = caster->query_property("altered");
+
+    spell_successful();
+    addSpellToCaster();
+}
+
+void dest_effect()
+{
+    object shape;
+    if (objectp(caster)) {
+
+        if (caster->query_property("shapeshifted")) {
+            shape = caster->query_property("shapeshifted");
+        } else {
+            shape = caster->query_property("altered");
+        }
+        if (objectp(shape)) {
+            shape->reverse_shape(caster);
+        }
+    }
+    ::dest_effect();
+    if (objectp(TO)) {
+        TO->remove();
+    }
+}
+#include <spell.h>
+#include <daemons.h>
+inherit SPELL;
+int bonus;
+
+string *valid_forms()
+{
+    return ({"weretiger","tiger",});
+}
+
+void create()
+{
+    ::create();
+    set_spell_name("weretiger shape");
+    set_spell_level(([ "innate" : 1 ]));
+    set_spell_sphere("alteration");
+    set_syntax("cast CLASS weretiger shape on weretiger|tiger");
+    set_description("With this power weretiger can transform itself into another form, that being of a huge tiger or humanoid tiger-like being. First form acts much like your common tiger in combat, with powerful specials. Hybrid form looks a lot like original humanoid form, with tiger-like ears and soft fur cover. Both forms provide bonuses to physical attributes and armor class, sight, attack, damage, perception, survival bonuses and weakness to silver.
+
+%^BOLD%^%^RED%^N.B.%^RESET%^ You can set alternative description, speech string and adjective for these forms.");
+    set_arg_needed();
+    set_helpful_spell(1);
+}
+
+int preSpell()
+{
+    object shape;
+    if (objectp(shape = caster->query_property("shapeshifted")) ||
+        objectp(shape = caster->query_property("altered"))) {
+        tell_object(caster, "You are already in an alternative form!");
+        return 0;
+    }
+    if (member_array(arg, valid_forms()) == -1) {
+        tell_object(caster, "Invalid form, valid forms are: " + implode(valid_forms(), ", "));
+        return;
+    }
+    return 1;
+}
+
+void spell_effect(int prof)
+{
+    object shape;
+    if (!objectp(caster)) {
+        TO->remove();
+        return;
+    }
+    new("/std/races/shapeshifted_races/weretiger_" + arg + ".c")->init_shape(caster, arg);
+
+    if (caster->query_property("shapeshifted")) {
+        shape = caster->query_property("shapeshifted");
+    } else {
+        shape = caster->query_property("altered");
+    }
+
+    spell_successful();
+    addSpellToCaster();
+}
+
+void dest_effect()
+{
+    object shape;
+    if (objectp(caster)) {
+        if (caster->query_property("shapeshifted")) {
+            shape = caster->query_property("shapeshifted");
+        } else {
+            shape = caster->query_property("altered");
+        }
+        if (objectp(shape)) {
+            shape->reverse_shape(caster);
+        }
+    }
+    ::dest_effect();
+    if (objectp(TO)) {
+        TO->remove();
+    }
+}
+#include <spell.h>
+#include <daemons.h>
+inherit SPELL;
+int bonus;
+
+string *valid_forms()
+{
+    return ({"werewolf","wolf",});
+}
+
+void create()
+{
+    ::create();
+    set_spell_name("werewolf shape");
+    set_spell_level(([ "innate" : 1 ]));
+    set_spell_sphere("alteration");
+    set_syntax("cast CLASS werewolf shape on werewolf|wolf");
+    set_description("With this power werewolf can transform itself into another form, that being of a huge wolf or humanoid wolf-like being. First form acts much like your common wolf in combat, with powerful specials. Hybrid form looks a lot like original humanoid form, with wolf-like ears and soft fur cover. Both forms provide bonuses to physical attributes and armor class, sight, attack, damage, perception, survival bonuses and weakness to silver.
+
+%^BOLD%^%^RED%^N.B.%^RESET%^ You can set alternative description, speech string and adjective for these forms.");
+    set_arg_needed();
+    set_helpful_spell(1);
+}
+
+int preSpell()
+{
+    object shape;
+    if (objectp(shape = caster->query_property("shapeshifted")) ||
+        objectp(shape = caster->query_property("altered"))) {
+        tell_object(caster, "You are already in an alternative form!");
+        return 0;
+    }
+    if (member_array(arg, valid_forms()) == -1) {
+        tell_object(caster, "Invalid form, valid forms are: " + implode(valid_forms(), ", "));
+        return;
+    }
+    return 1;
+}
+
+void spell_effect(int prof)
+{
+    object shape;
+    if (!objectp(caster)) {
+        TO->remove();
+        return;
+    }
+    new("/std/races/shapeshifted_races/werewolf_" + arg + ".c")->init_shape(caster, arg);
+
+    if (caster->query_property("shapeshifted")) {
+        shape = caster->query_property("shapeshifted");
+    } else {
+        shape = caster->query_property("altered");
+    }
+
+    spell_successful();
+    addSpellToCaster();
+}
+
+void dest_effect()
+{
+    object shape;
+    if (objectp(caster)) {
+        if (caster->query_property("shapeshifted")) {
+            shape = caster->query_property("shapeshifted");
+        } else {
+            shape = caster->query_property("altered");
+        }
+        if (objectp(shape)) {
+            shape->reverse_shape(caster);
+        }
+    }
+    ::dest_effect();
+    if (objectp(TO)) {
+        TO->remove();
+    }
+}
+#include <std.h>
+#include <priest.h>
+
+inherit SPELL;
+
+object mywpn;
+
+void create()
+{
+    ::create();
+    set_spell_name("whip of centipedes");
+    set_spell_level(([ "bard" : 5, "druid" : 5, "mage" : 5, "magus" : 5, ]));
+    set_spell_sphere("conjuration_summoning");
+    set_syntax("cast CLASS whip of centipedes");
+    set_description("You summon a swarm of centipedes that form into a whip that extends from your hand.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_helpful_spell(1);
+}
+
+
+string query_cast_string()
+{
+    return "%^BOLD%^%^WHITE%^" + caster->QCN + " extens  " + caster->QP + " arm, a swarm centipedes starts crawl out of " +caster->QP+" sleeves.";
+}
+
+
+void spell_effect(int prof)
+{
+    if (!objectp(caster)) {
+        dest_effect();
+        return;
+    }
+
+    if (interactive(caster)) {
+        tell_object(caster, "%^BOLD%^%^WHITE%^Spiders attach to each other, forming a whip that extends from your hand.");
+    }
+
+    tell_room(place, "%^BOLD%^%^WHITE%^Spiders on " + caster->QCN + "'s hands attach to each other, forming a whip!", caster);
+
+    mywpn = new("/d/magic/obj/whip_of_centipedes");
+    mywpn->make_me(TO);
+    mywpn->move(caster);
+
+    caster->remove_paralyzed();
+    caster->force_me("wield weapon");
+    addSpellToCaster();
+    spell_successful();
+}
+
+
+void dest_effect()
+{
+    if (objectp(mywpn) && objectp(caster)) {
+        mywpn->remove();
+        tell_room(ENV(caster), "%^BOLD%^%^WHITE%^Spiders fall to the ground and quickly disperse around...");
+    }
+    ::dest_effect();
+    if (objectp(TO)) {
+        TO->remove();
+    }
+}
+#include <std.h>
+#include <priest.h>
+
+inherit SPELL;
+
+object mywpn;
+
+void create()
+{
+    ::create();
+    set_spell_name("whip of spiders");
+    set_spell_level(([ "bard" : 2, "druid" : 2, "mage" : 2, "magus" : 2, "nightblade":2]));
+    set_spell_sphere("conjuration_summoning");
+    set_syntax("cast CLASS whip of spiders");
+    set_description("You summon hundreds of tiny spiders that form into a whip that extends from your hand.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_helpful_spell(1);
+}
+
+
+string query_cast_string()
+{
+    return "%^BOLD%^%^WHITE%^" + caster->QCN + " extens  " + caster->QP + " arm, an army of tiny spiders starts crawl out of " +caster->QP+" sleeves.";
+}
+
+
+void spell_effect(int prof)
+{
+    if (!objectp(caster)) {
+        dest_effect();
+        return;
+    }
+
+    if (interactive(caster)) {
+        tell_object(caster, "%^BOLD%^%^WHITE%^Spiders attach to each other, forming a whip that extends from your hand.");
+    }
+
+    tell_room(place, "%^BOLD%^%^WHITE%^Spiders on " + caster->QCN + "'s hands attach to each other, forming a whip!", caster);
+
+    mywpn = new("/d/magic/obj/whip_of_spiders");
+    mywpn->make_me(TO);
+    mywpn->move(caster);
+
+    caster->remove_paralyzed();
+    caster->force_me("wield weapon");
+    addSpellToCaster();
+    spell_successful();
+}
+
+
+void dest_effect()
+{
+    if (objectp(mywpn) && objectp(caster)) {
+        mywpn->remove();
+        tell_room(ENV(caster), "%^BOLD%^%^WHITE%^Spiders fall to the ground and quickly disperse around...");
+    }
+    ::dest_effect();
+    if (objectp(TO)) {
+        TO->remove();
+    }
+}
+#include <priest.h>
+
+void create()
+{
+    ::create();
+    set_author("ares");
+    set_spell_name("whispering wind");
+    set_spell_level((["bard" : 2, "mage" : 2, "inquisitor" : 2, "nightblade" : 2]));
+    set_spell_sphere("divination");
+    set_domains("air");
+    set_syntax("cast CLASS whispering wind on TARGET with the message <message>");
+    set_description("This spell will allow the caster to attempt to send a brief message on the winds from them to their target.  The caster has no way of knowing if the target has heard their message.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_arg_needed();
+    set_helpful_spell(1);
+}
+
+string query_cast_string()
+{
+    tell_object(caster, "%^BOLD%^%^BLUE%^Cupping your hands, you whisper into the air. " +
+                "Suddenly a breeze blows through, carrying your words with it.");
+    tell_room(place, "%^BOLD%^" + caster->QCN + " cups " +
+              "" + caster->QP + " hands and whispers into the air.\n Suddenly a breeze" +
+              " blows through, rustling " + caster->QCN + "'s clothing before it departs.", caster);
+    return "display";
+}
+
+void spell_effect(int prof)
+{
+    object who;
+    string* info, * mess = ({}), message;
+    int i;
+
+    if (!arg) {
+        tell_object(caster, "You need a message to send..\n"
+                    "syntax: cast CLASS whispering wind to TARGET with the message <message>");
+        dest_effect();
+        return;
+    }
+    info = explode(arg, " ");
+    if (sizeof(info) < 5) {
+        tell_object(caster, "You must use the syntax: \n"
+                    "cast CLASS whispering wind to TARGET with the message <message>");
+        dest_effect();
+        return;
+    }
+    // there has to be a more elegant way to do this...
+    if ("" + info[1] + " " + info[2] + " " + info[3] + "" != "with the message") {
+        tell_object(caster, "You must use the syntax: \n"
+                    "cast CLASS whispering wind to TARGET with the message <message>");
+        dest_effect();
+        return;
+    }
+
+    if (!(who = find_player(caster->realName(lower_case(info[0]))))) {
+        tell_object(caster, "%^BOLD%^%^WHITE%^The winds stir as you send your "
+                    "message away on the breeze.");
+        dest_effect();
+        return;
+    }
+    if (lower_case(info[0]) == (string)caster->query_true_name()) {
+        tell_object(caster, "You whisper to yourself.");
+        dest_effect();
+        return;
+    }
+
+    if ((member_array((string)caster->query_true_name(), (string*)who->query_ignored()) != -1)) {
+        tell_object(caster, "%^BOLD%^%^WHITE%^The winds stir as you send your "
+                    "message away on the breeze.");
+        dest_effect();
+        return;
+    }
+
+    for (i = 4; i < sizeof(info); i++) {
+        mess += ({ info[i] });
+    }
+    message = implode(mess, " ");
+    if (who->query_true_invis() || avatarp(who)) {
+        tell_object(caster, "%^BOLD%^%^WHITE%^The winds stir as you send your "
+                    "message away on the breeze.");
+        tell_object(who, "%^BOLD%^" + caster->QCN + " just tried to send you the whispering wind "
+                    "message: " + message + "");
+        dest_effect();
+        return;
+    }else if (who->query_unconscious()) {
+        tell_object(caster, "%^BOLD%^%^WHITE%^The winds stir as you send your "
+                    "message away on the breeze.");
+        dest_effect();
+        return;
+    }
+    // might consider putting language checks here later
+    else {
+        tell_object(caster, "%^BOLD%^%^WHITE%^The winds stir as you send your "
+                    "message away on the breeze.");
+        tell_object(who, "%^BOLD%^%^BLUE%^A gentle breeze stirs around you," +
+                    " the sound of barely audible words carried on it.\n" +
+                    "%^BOLD%^%^CYAN%^Upon the breeze, " + caster->QCN + "'s voice is " +
+                    "carried with these words " + message + "\n");
+        dest_effect();
+        return;
+    }
+    return;
+}
+
+void dest_effect()
+{
+    ::dest_effect();
+    if (objectp(TO)) {
+        TO->remove();
+    }
+}
+#include <std.h>
+#include <magic.h>
+inherit SPELL;
+
+int trackera, trackerb;
+
+void create()
+{
+    ::create();
+    set_spell_name("wieldskill");
+    set_spell_level(([ "inquisitor" : 2, "mage" : 2, "magus" : 2, "paladin" : 2, "psion" : 2 ]));
+    set_spell_sphere("enchantment_charm");
+    set_syntax("cast CLASS wieldskill");
+    set_damage_desc("simple, martial and exotic weapon proficiencies");
+    set_description("This gives the caster proficiency with any kind of weapon, provided they are able to wield it.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_helpful_spell(1);
+}
+
+string query_cast_string()
+{
+    tell_object(caster, "%^YELLOW%^They lyrics to an ancient prayer flood" +
+                " into your mind as you begin to hum");
+    tell_room(place, "%^YELLOW%^" + caster->QCN + " begins to hum.", caster);
+    return "display";
+}
+
+int preSpell()
+{
+    if (caster->query_property("wieldskill")) {
+        tell_object(caster, "You already have this spell active.");
+        return 0;
+    }
+    return 1;
+}
+
+void spell_effect(int prof)
+{
+    tell_room(place, "%^YELLOW%^" + caster->QCN + " chants the lyrics of a " +
+              "melodic prayer. Suddenly, " + caster->QP + " eyes brighten with" +
+              " enlightenment.", caster);
+    tell_object(caster, "%^YELLOW%^You feel a greater understanding of" +
+                " combat filling your mind.");
+
+    caster->set_property("wieldskill", 1);
+    if (member_array("martial weapon proficiency", (string*)caster->query_temporary_feats()) == -1) {
+        caster->add_temporary_feat("martial weapon proficiency");
+        trackera = 1;
+    }
+    if (member_array("exotic weapon proficiency", (string*)caster->query_temporary_feats()) == -1) {
+        caster->add_temporary_feat("exotic weapon proficiency");
+        trackerb = 1;
+    }
+    caster->set_property("spelled", ({ TO }));
+    spell_duration = (clevel + roll_dice(1, 20)) * ROUND_LENGTH * 8;
+    set_end_time();
+    call_out("dest_effect",spell_duration);
+    addSpellToCaster();
+}
+
+void dest_effect()
+{
+    if (objectp(caster)) {
+        caster->remove_property("wieldskill");
+        tell_object(caster, "%^YELLOW%^The knowledge of weapon skill leaves you.");
+        tell_room(environment(caster), "%^YELLOW%^Frowning for a moment," +
+                  " " + caster->QCN + " scratches " + caster->QP + " head.", caster);
+        if (trackerb == 1) {
+            caster->remove_temporary_feat("exotic weapon proficiency");
+        }
+        if (trackera == 1) {
+            caster->remove_temporary_feat("martial weapon proficiency");
+        }
+    }
+    ::dest_effect();
+    if (objectp(TO)) {
+        TO->remove();
+    }
+}
+#include <spell.h>
+#include <daemons.h>
+#include <magic.h>
+inherit SPELL;
+
+object storm_room;
+int duration;
+
+void create()
+{
+    ::create();
+    set_author("ares");
+    set_spell_name("windstorm");
+    set_spell_level(([ "druid":8, "oracle" : 8 ]));
+    set_mystery("wind");
+    set_spell_sphere("invocation_evocation");
+    set_domains("air");
+    set_syntax("cast CLASS windstorm");
+    set_damage_desc("bludgeoning, tripped for 1d4 rounds");
+    set_description("This spell calls on the power of the plane of air to unleash a terrible gale of wind that sends "
+        "debris whipping around the caster's enemies.  It has a chance to blind them with sand, and even knock them from their "
+        "feet.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_save("reflex");
+    aoe_spell(1);
+    set_aoe_message("%^BOLD%^%^CYAN%^(buffeted by fierce winds)%^RESET%^");
+}
+
+
+string query_cast_string()
+{
+    tell_object(caster,"%^BOLD%^You begin to turn around in a circle, as you"+
+        " begin your howling prayer.");
+    tell_room(place,"%^BOLD%^"+caster->QCN+" turns around in a circle, as"+
+        ""+caster->QP+" begins a howling prayer.",caster);
+    return "display";
+}
+
+void spell_effect(int prof)
+{
+    duration = (ROUND_LENGTH * clevel)/2;
+    tell_room(place,"%^BOLD%^"+caster->QCN+" whispers a soft chant into the winds "
+        "and a gale force wind howls into the area!");
+    tell_object(caster,"%^BOLD%^You whisper a soft chant into the winds and a "
+        "gale of wind answers your call!");
+
+    caster->set_property("spelled", ({TO}));
+
+    storm_room = environment(caster);
+    addSpellToCaster();
+    spell_successful();
+    spell_duration = duration;
+    set_end_time();
+    call_out("dest_effect",duration);
+}
+
+
+void execute_attack()
+{
+    object *attackers = ({});
+    int i;
+
+    ::execute_attack();
+
+    if(!objectp(caster) || !objectp(environment(caster)) || caster->query_unconscious())
+    {
+        dest_effect();
+        return;
+    }
+
+    if(environment(caster) != storm_room)
+    {
+        tell_object(caster,"%^BOLD%^%^BLUE%^The howling winds calm as you leave the area.");
+        tell_room(storm_room,"%^BOLD%^%^BLUE%^The howling winds return to normal as "
+            ""+caster->QCN+" leaves the area.");
+        dest_effect();
+        return;
+    }
+
+    attackers = target_selector();
+
+    if(sizeof(attackers))
+    {
+        tell_room(storm_room,"%^BOLD%^%^BLACK%^The winds howl furiously, throwing debris around "
+            "in a chaotic swirl.");
+        for(i=0;i<sizeof(attackers);i++)
+        {
+            if(!objectp(attackers[i])) { continue; }
+            if(!storm_effects(attackers[i])) { continue; }
+        }
+    }
+    place->addObjectToCombatCycle(TO,1);
+}
+
+
+int storm_effects(object obj)
+{
+    int damage;
+    object room;
+    if(!objectp(obj))               { return 0; }
+    if(!objectp(environment(obj)))  { return 0; }
+    room = environment(obj);
+
+    tell_object(obj,"%^BOLD%^%^BLACK%^The winds howl aound you, making it difficult to "
+        "see and hear!");
+
+    define_base_damage(0);
+    damage = sdamage;
+
+    if(do_save(obj,0))
+    {
+        tell_object(obj,"%^BOLD%^%^BLUE%^You dodge away from most of the debris, taking "
+            "only a small amount of damage!");
+        tell_room(room,""+obj->QCN+" dodges away from the swirling debris!",obj);
+        damage_targ(obj,obj->return_target_limb(),damage/2,"bludgeoning");
+    }
+    else
+    {
+        tell_object(obj,"%^BOLD%^%^BLUE%^The stinging wind sends debris everything, pelting "
+            "your skin and tearing at your flesh!");
+        tell_room(room,"%^BOLD%^%^BLUE%^"+obj->QCN+" gets pelted painfully with whipping debris!",obj);
+        damage_targ(obj,obj->return_target_limb(),damage,"bludgeoning");
+    }
+
+    if (!do_save(obj, 4) && obj->set_tripped(roll_dice(1, 4), "%^BOLD%^You are struggling to get back to your feet!", 2)) {
+        tell_object(obj, "%^BOLD%^%^WHITE%^The wind throws you from your feet, swirling your "
+                    "body up into the air before you hit the ground with a thud!");
+        tell_room(room, "%^BOLD%^%^WHITE%^" + obj->QCN + " is suddenly caught by the force of the "
+                  "wind and sent spinning into the air before " + obj->QS + " crashes "
+                  "back to the ground with a bone jarring thud!");
+    }
+
+    return 1;
+}
+
+
+void dest_effect()
+{
+    if(objectp(place)) tell_room(place,"%^BOLD%^%^BLUE%^The howling winds calm and the air returns to normal.");
+    if(objectp(caster))
+    {
+        caster->remove_property_value("spelled", ({TO}));
+    }
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+
+}
+#include <std.h>
+#include <magic.h>
+inherit SPELL;
+
+void create(){
+    ::create();
+    set_author("nienne");
+    set_spell_name("witchwood step");
+    set_spell_level(([ "warlock" : 2 ]));
+    set_spell_sphere("abjuration");
+    set_syntax("cast CLASS witchwood step");
+    set_damage_desc("freedom of movement on demand");
+    set_description("This invocation attunes the warlock to an element of flowing energy, commonly that of air, "
+"water, or the chaotic fluctuations of the feywild. Such energies will lie dormant in the caster's veins, triggering "
+"at the next time the caster is stunned or tripped to grant them freedom from the effect. The power of this invocation "
+"is such that the caster will need to wait a brief period once activated before it can be cast again. It can only be "
+"cast while at peace.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_peace_needed(1);
+    set_helpful_spell(1);
+}
+
+int preSpell(){
+   if(caster->query_property("freedom")){
+      tell_object(caster,"%^GREEN%^You are already protected by a freedom spell.%^RESET%^");
+      return 0;
+   }
+   return 1;
+}
+
+string query_cast_string(){
+   tell_object(caster,"%^BOLD%^%^GREEN%^You mutter an incantation and lift a foot.%^RESET%^");
+   tell_room(place,"%^BOLD%^%^GREEN%^"+caster->QCN+" mutters an incantation as "+caster->QP+" foot rises.%^RESET%^",caster);
+   return "display";
+}
+
+void spell_effect(int prof){
+   object obj;
+
+   tell_object(caster,"%^GREEN%^As your foot touches the ground again, a pulse of %^CYAN%^air %^GREEN%^ripples outward from "
+        "the point of impact. A sudden %^RESET%^lightness %^GREEN%^of movement infuses your limbs!%^RESET%^\nUse <freeme> to activate.");
+   tell_room(place,"%^GREEN%^As "+caster->QCN+"'s foot touches the ground again, a pulse of air ripples outward from the point of impact.%^RESET%^",caster);
+   obj = new("/d/magic/obj/freedom");
+   obj->set_mycaster(caster);
+   obj->set_spellob(TO);
+   obj->set_mylevel(clevel/10);
+   obj->move(caster);
+   addSpellToCaster();
+   caster->set_property("spelled",({TO}));
+   caster->set_property("freedom",1);
+   spell_successful();
+}
+
+void dest_effect(){
+   if(objectp(caster)){
+      tell_object(caster,"%^GREEN%^Your limbs feel suddenly cumbersome again.%^RESET%^");
+      caster->remove_property("freedom",1);
+   }
+   ::dest_effect();
+   if(objectp(TO)) TO->remove();
+
+}
+#include <std.h>
+#include <magic.h>
+inherit SPELL;
+
+object witnessob,remote;
+string theName;
+#define DELAY 180
+
+void create(){
+    ::create();
+    set_spell_name("witness");
+    set_spell_level(([ "inquisitor" : 3, "bard" : 3, "psion":3, "nightblade":3]));
+    set_spell_sphere("divination");
+    set_syntax("cast CLASS witness on TARGET");
+    set_description("You link your senses to the target, allowing you to see and hear through its eyes and ears. For the duration of the effect you'll remain blinded.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_arg_needed();
+    set_silent_casting(1);
+}
+
+int preSpell(){
+   if(caster->query_property("remote scrying")){
+      tell_object(caster,"You are already listening somewhere!");
+      return 0;
+   }
+   if(avatarp(caster)) return 1; // let avatars use to follow players regardless of timer.
+   if((int)caster->query_property("remote scrying time")+DELAY > time()){
+      tell_object(caster,"You cannot command your witnessob again so soon.");
+      return 0;
+   }
+   return 1;
+}
+
+void spell_effect(int prof){
+    object ob, blockobj;
+    int power, duration;
+
+    if (ob = find_player(caster->realNameVsProfile(arg)))
+    {
+        if (objectp(ob) && !wizardp(ob)){
+            tell_object(caster,"%^RED%^You concentrate to see through the eyes of "+arg+".%^RESET%^");
+            if(environment(ob)->query_property("no scry")){
+                tell_object(caster,"Something blocks your attempt!");
+                return;
+            }
+            power = clevel + 6;
+            if(blockobj = present("blockerx111", environment(ob)) || blockobj = present("blockerx111",ob)){
+               if(power < blockobj->query_block_power()){
+                  tell_object(caster, "Something blocks your attempt!");
+                  return;
+               }
+            }
+            witnessob = new("/d/magic/obj/witnessob");
+            witnessob->set_caster(caster);
+            witnessob->set_property("spell",TO);
+            witnessob->set_property("spelled", ({TO}) );
+            witnessob->set_target(ob);
+            witnessob->set_scry_power(power);
+            witnessob->move(environment(ob));
+            theName = ob->query_short();
+            duration = ROUND_LENGTH*clevel*6;
+
+            caster->set_temporary_blinded(duration);
+            spell_duration = duration;
+            set_end_time();
+            call_out("dest_effect",duration);
+            caster->set_property("remote scrying",1);
+            call_out("check_blindness",ROUND_LENGTH);
+            addSpellToCaster();
+            return;
+        }
+    }
+    tell_object(caster,"Your power goes unfocused.");
+}
+
+void check_blindness()
+{
+    if(!caster->query_blind() ||
+       sizeof(caster->query_attackers()))
+    {
+        tell_object(caster,"%^RED%^As you regain your senses, you can no longer concentrate on the events afar.");
+        dest_effect();
+    }
+    else
+        call_out("check_blindness",ROUND_LENGTH);
+}
+
+void dest_effect()
+{
+    if (objectp(witnessob))
+        witnessob->dest_me();
+    if(objectp(caster)) {
+        caster->set_blind(0);
+        caster->set_blinded(0);
+        caster->remove_property("remote scrying");
+        caster->remove_property("remote scrying time");
+        caster->set_property("remote scrying time",time());
+    }
+    ::dest_effect();
+    if(objectp(TO)) TO->remove();
+}
+
+string query_spell_display(){
+   return "Witnessing: "+theName;
+}
+#include <std.h>
+#include <spell.h>
+
+inherit SPELL;
+
+string * GIBBERISH = ({
+            "Bye!",
+            "Do you respect me?!",
+            "Great pillows!",
+            "I am the king! Kneel!",
+            "I am the queen! Kneel!",
+            "I like heat in a certain way!",
+            "I love you!",
+            "I really don't!",
+            "I reject your accusations!",
+            "I stink!",
+            "It's a rough situation over here!",
+            "Join me, I have cookies!",
+            "Cookies are better than you!",
+            "Let me join you!",
+            "Look! Over there!",
+            "No collusion!",
+            "Nobody knows what who knows!",
+            "Our country is the best!",
+            "The moon is fluffy today!",
+            "Together we will make the world great again!",
+            "We all are fighting battles!",
+            "What's happening is a disgrace!",
+            "Who knows, you know?!",
+            "You know what you know you know?!",
+            "You stink!",
+            "You're mean! Bye!",
+            "Your shoes are untied!",
+            "Your mother was a hamster!",
+            "You father smelt of elderberries!",
+            "I fart in your general direction!",
+            "Klaatu barada nikto",
+            "Are you threatening me?",
+                });
+
+create()
+{
+    ::create();
+    set_spell_name("word of chaos");
+    set_spell_level(([ "cleric" : 7, "inquisitor" : 6 ]));
+    set_spell_sphere("invocation_evocation");
+    set_domains("chaos");
+    set_syntax("cast CLASS word of chaos on TARGET");
+    set_description("You shout some gibberish. Upon hearing it, the target may be briefly stunned, confused, or even die from such nonsense. Will save will negate some of the effects.");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_target_required(1);
+    set_save("will");
+}
+
+string query_cast_string()
+{
+    tell_object(caster,"%^BOLD%^You can feel a chaotic pressence building inside, as you chant the words of chaos.");
+    tell_room(place,"%^BOLD%^"+caster->QCN+" chants some gibberish.",caster);
+    return "display";
+}
+
+
+void spell_effect()
+{
+    int ldiff;
+
+    ldiff=(clevel-target->query_level());
+
+    caster->force_me("yell %^WHITE%^%^BOLD%^"+GIBBERISH[random(sizeof(GIBBERISH))]);
+
+    if(!do_save(target,4))
+    {
+        tell_room(place,"%^BOLD%^"+target->QCN+" stops for a moment with thoughtful expression.",target);
+    tell_object(target,"%^BOLD%^%^You are stunned by this utter nonsense.");
+    target->set_paralyzed(8*2,"You are stunned by gibberish you just heard.");
+    }
+
+    if(ldiff>4)
+    {
+        "/std/magic/confusion"->confuse(caster,target);
+    }
+
+    if(ldiff>9)
+    {
+        if(!(do_save(target,4)||
+             target->query_property("no death")))
+        {
+            tell_room(place,"%^BOLD%^Upon hearing the words "+target->QCN+" simply explodes!",target);
+            tell_object(target,"%^BOLD%^WHAT "+caster->QS+" DID JUST SAY");
+            damage_targ(target,target->return_target_limb(),target->query_max_hp()*2,"mental");
+        }
+    }
+
+    dest_effect();
+    return;
+}
+#include <priest.h>
+inherit SPELL;
+
+#define ACTIVETEMPLES ({ "jarmila", "kreysneothosies", "cevahir", "lord shadow", "lysara", "the faceless one", "callamir", "kismet", "nilith", "nimnavanon", "seija","khyron"})
+
+void create()
+{
+    ::create();
+    set_spell_name("word of power");
+    set_spell_level(([ "cleric" : 6, "inquisitor" : 2, "druid" : 6, "paladin" : 2]));
+    set_spell_sphere("alteration");
+    set_syntax("cast CLASS word of power [to DESTINATION]");
+    set_description("Word of power will teleport you to a church of your choice.  For now, you can reach the following churches:
+
+Antioch
+Asgard (Laerad)
+Azha
+Dallyh
+Eldebaro (East Oasis)
+Graez (Sangri)
+Ice
+Juran
+Kinaro
+Lothwaite
+Muul'daan
+Nurval
+Seneca (Attaya)
+Shadow
+Tabor
+Tharis
+Tonovi
+Torm
+Verbobone (Deku)
+
+You can also go to the temple of your deity by using 'temple' as the location.
+");
+    set_verbal_comp();
+    set_somatic_comp();
+    set_arg_needed();
+    set_peace_needed(1);
+    set_helpful_spell(1);
+}
+
+void spell_effect(int prof)
+{
+    string arg, where, placename, mygod;
+    int mypower, startpower, endpower, bonus;
+
+    arg = lower_case(ARG);
+    tell_object(CASTER, "You reach your hands out and wave them in strange motions.");
+    tell_room(PLACE, YOU + " reaches out and waves " + MINE + " arms in strange motions.", ({ CASTER }));
+    switch (arg) {
+    case "shadow":
+        where = "/d/shadow/city/room/church";
+        placename = "Shadow";
+        break;
+    case "dallyh":
+    case "amazons":
+        where = "/d/islands/dallyh/forest/rooms/church";
+    placename = "Dallyh";
+    break;
+    case "tharis":
+        where = "/d/tharis/newtharis/rooms/tharis_church1.c";
+        placename = "Tharis";
+        break;
+    case "azha":
+        where = "/d/azha/town/church";
+        placename = "Azha";
+        break;
+    case "kinaro":
+        where = "/d/dagger/kinaro/church";
+        placename = "Kinaro";
+        break;
+    case "lothwaite":
+        where = "/d/barriermnts/lothwaite/rooms/chapel5";
+        placename = "Lothwaite";
+        break;
+    case "seneca":
+        where = "/d/attaya/newseneca/rooms/cath_nave";
+        placename = "Seneca";
+        break;
+    case "graez":
+    case "sangri":
+        where = "/d/undead/rooms/town/church1";
+    placename = "Graez";
+    break;
+    case "asgard":
+        where = "/d/laerad/parnelli/asgard/as72";
+        placename = "Asgard";
+        break;
+    case "antioch":
+        where = "/d/antioch/wild/forest/chapel_out";
+        placename = "Antioch";
+        break;
+    case "juran":
+        where = "/d/shadow/juran/city/church";
+        placename = "Juran";
+        break;
+    case "deku":
+    case "verbobone":
+        where = "/d/deku/town/church";
+    placename = "Verbobone";
+    break;
+    case "tonovi":
+        where = "/d/dagger/tonovi/town/temple1.c";
+        placename = "Tonovi";
+        break;
+    case "nurval":
+        where = "/d/dagger/nurval/room/shrine";
+        placename = "Nurval";
+        break;
+    case "eldebaro":
+        placename = "Eldebaro";
+        where = "/d/islands/common/eldebaro/newrooms/church";
+        break;
+    case "torm":
+        where = "/d/dagger/Torm/city/c101b.c";
+        placename = "Torm";
+        break;
+    case "tabor":
+        where = "/d/darkwood/tabor/room/church";
+        placename = "Tabor";
+        break;
+    case "muuldaan":
+    case "muul'daan":
+        where = "/d/shadow/room/muuldaan/rooms/church";
+    placename = "Muul'daan";
+    break;
+    case "ice":
+        where = "/d/islands/elf/church";
+    placename = "ice";
+    break;
+    default:
+        mygod = (string)CASTER->query_diety();
+        if (member_array(mygod, ACTIVETEMPLES) != -1) {
+            placename = "the Temple of " + capitalize(mygod);
+            mygod = replace_string(mygod, " ", "_");
+            where = "/d/magic/temples/" + mygod + "/" + mygod;
+            break;
+        } else {
+            where = "/d/darkwood/room/road18";
+            placename = "Shadow";
+            break;
+        }
+    }
+
+    if (!objectp(find_object_or_load(where))) {
+        tell_object(caster, "Nothing happens.");
+        dest_effect();
+        return;
+    }
+
+    if (environment(caster)->query_property("no teleport") ||
+        where->query_property("no teleport")) {
+        tell_object(caster, "Nothing happens.");
+        dest_effect();
+        return;
+    }
+    if (where &&
+        (where->query_property("teleport proof") ||
+         place->query_property("teleport proof") ||
+         !where->is_room())) {
+        startpower = place->query_property("teleport proof");
+        endpower = where->query_property("teleport proof");
+        bonus = caster->query_stats("wisdom");
+        bonus = bonus - 10;
+        if ((object*)caster->query_attackers() != ({})) {
+            mypower = CLEVEL + bonus + random(6);
+        }else {
+            mypower = CLEVEL + bonus + random(6) + 5;
+        }
+        if ((mypower < startpower) || (mypower < endpower)) {
+            tell_object(CASTER, "Nothing happens.");
+            dest_effect();
+            return;
+        }
+    }
+
+    caster->clear_followers();
+
+    tell_object(CASTER, "You are magically transported to the church in " + placename + ".");
+    find_object_or_load(where)->set_property("recent teleport", place);
+    place->set_property("recent teleport", find_object_or_load(where));
+    CASTER->move_player(where);
+
+    CASTER->set_casting(0);
+    dest_effect();
+}
+
+void dest_effect()
+{
+    ::dest_effect();
+    if (objectp(TO)) {
+        TO->remove();
+    }
+}
+#include <spell.h>
+#include <magic.h>
+#include <daemons.h>
+#include <teleport.h>
+
+inherit SPELL;
+mixed endplace;
+
+void move_caster(object endplace);
+
+void create()
+{
+    ::create();
+    set_spell_name("word of recall");
+    set_spell_level(([ "druid" : 8, "cleric" : 6, "inquisitor" : 5]));
+    set_spell_sphere("conjuration_summoning");
+    set_syntax("cast CLASS word of recall to LOCATION");
+    set_description("The word of recall spell will allow to travel to a location that she has previously  remembered from the 'remembered location' list.  To remember a new location use 'remember here as <location>', to see a list of all remembered locations, use 'recall locations'.\nThis spell must be cast while at peace.\nSee also: remember, unremember, recall");
+    set_verbal_comp();
+    set_arg_needed();
+    set_peace_needed(1);
+    set_helpful_spell(1);
+}
+
+string query_cast_string()
+{
+    tell_object(caster, "%^GREEN%^You close your eyes and concentrate, slowly fading into the essence of the world.");
+    tell_room(place, "%^GREEN%^" + caster->QCN + " closes " + caster->QP + " eyes and concentrates, slowly fading away!", caster);
+    return "display";
+}
+
+void spell_effect(int prof)
+{
+    int power, prob;
+
+    endplace = caster->query_rem_room(arg);
+
+    spell_successful();
+
+    if (!TELEPORT->object_can_be_teleported(caster, endplace, clevel)) {
+        tell_object(caster, "You sense something is wrong with your spell and it backfires.");
+        tell_room(place, caster->QCN + " " +
+                  "looks startled.", caster);
+        damage_targ(caster, caster->return_target_limb(), sdamage / 4, "mental");
+        dest_effect();
+    }
+    call_out("spell_effect_next", ROUND_LENGTH);
+}
+
+void spell_effect_next()
+{
+    if (!objectp(caster)) {
+        dest_effect();
+        return;
+    }
+
+    if (!objectp(ENV(caster))) {
+        dest_effect();
+        return;
+    }
+
+    if (ENV(caster) != place) {
+        dest_effect();
+        return;
+    }
+
+    if (!TELEPORT->teleport_object(caster, caster, endplace, clevel)) {
+        tell_object(caster, "You sense something is wrong with your spell and loose concentration.");
+        tell_room(place, caster->QCN + " looks startled.", caster);
+    }
+
+    dest_effect();
+}
+
+void dest_effect()
+{
+    ::dest_effect();
+    if (objectp(TO)) {
+        TO->remove();
+    }
+}
+
